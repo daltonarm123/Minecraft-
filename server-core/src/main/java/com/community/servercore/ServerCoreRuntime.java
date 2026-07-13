@@ -8,7 +8,7 @@ import com.community.servercore.command.PortalCommandService;
 import com.community.servercore.config.JsonConfigLoader;
 import com.community.servercore.config.ServerCoreConfig;
 import com.community.servercore.cosmetic.CosmeticsService;
-import com.community.servercore.cosmetic.InMemoryCosmeticRepository;
+import com.community.servercore.cosmetic.JsonCosmeticRepository;
 import com.community.servercore.duel.ArenaRegistry;
 import com.community.servercore.duel.MatchmakingService;
 import com.community.servercore.duel.RatingService;
@@ -108,7 +108,7 @@ public final class ServerCoreRuntime {
                 clock,
                 300);
         CosmeticsService cosmeticsService = new CosmeticsService(
-                new InMemoryCosmeticRepository());
+                new JsonCosmeticRepository(normalizedDirectory.resolve("cosmetics.json")));
         AuditSink auditSink = new InMemoryAuditSink();
         auditSink.publish(AuditEvent.system(
                 AuditEventType.CONFIG_LOADED,
