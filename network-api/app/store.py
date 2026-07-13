@@ -39,6 +39,21 @@ class NetworkStore:
             player = self._players.get(player_id)
             return None if player is None else player.model_copy(deep=True)
 
+    def get_player_by_username(self, username: str) -> PlayerRecord | None:
+        normalized = username.strip().casefold()
+        if not normalized:
+            return None
+        with self._lock:
+            player = next(
+                (
+                    candidate
+                    for candidate in self._players.values()
+                    if candidate.username.casefold() == normalized
+                ),
+                None,
+            )
+            return None if player is None else player.model_copy(deep=True)
+
     def leaderboard(self, limit: int) -> list[LeaderboardEntry]:
         if limit < 1 or limit > 1000:
             raise ValueError("limit must be between 1 and 1000")
