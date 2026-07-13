@@ -1,6 +1,7 @@
 package com.community.servercore.neoforge;
 
 import com.community.servercore.service.PortalAccessService;
+import net.minecraft.commands.Commands;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 
@@ -26,6 +27,8 @@ final class NeoForgePortalAccessService implements PortalAccessService {
             return false;
         }
         ServerPlayer player = server.getPlayerList().getPlayer(playerId);
-        return player != null && player.createCommandSourceStack().hasPermission(2);
+        return player != null
+                && Commands.hasPermission(Commands.LEVEL_GAMEMASTERS)
+                        .test(player.createCommandSourceStack());
     }
 }
