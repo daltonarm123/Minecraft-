@@ -63,7 +63,6 @@ Revalidate these values before updating the ATM11 server pack. See `platform/atm
 server-core/          Platform-independent Java domain and services
 servercore-neoforge/  ATM11/NeoForge Minecraft adapter and mod build
 network-api/          FastAPI service
-Discord-bot/          Reserved; use discord-bot/
 discord-bot/          Discord community bot
 website/              Public status and leaderboard site
 infrastructure/       Docker Compose and deployment notes
