@@ -1,0 +1,21 @@
+package com.community.servercore.audit;
+
+public enum AuditEventType {
+    SERVER_STARTED,
+    SERVER_STOPPED,
+    CONFIG_LOADED,
+    PORTAL_CREATED,
+    PORTAL_UPDATED,
+    PORTAL_DELETED,
+    PORTAL_USED,
+    PORTAL_DENIED,
+    PORTAL_FAILED,
+    PLAYER_JOINED,
+    PLAYER_LEFT,
+    DUEL_QUEUED,
+    DUEL_MATCHED,
+    DUEL_STARTED,
+    DUEL_COMPLETED,
+    DUEL_CANCELLED,
+    ADMIN_COMMAND
+}
