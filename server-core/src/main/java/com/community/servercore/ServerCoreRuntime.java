@@ -7,6 +7,8 @@ import com.community.servercore.audit.InMemoryAuditSink;
 import com.community.servercore.command.PortalCommandService;
 import com.community.servercore.config.JsonConfigLoader;
 import com.community.servercore.config.ServerCoreConfig;
+import com.community.servercore.cosmetic.CosmeticsService;
+import com.community.servercore.cosmetic.InMemoryCosmeticRepository;
 import com.community.servercore.duel.ArenaRegistry;
 import com.community.servercore.duel.MatchmakingService;
 import com.community.servercore.duel.RatingService;
@@ -34,6 +36,7 @@ public final class ServerCoreRuntime {
     private final PlayerStatsService playerStatsService;
     private final ArenaRegistry arenaRegistry;
     private final MatchmakingService matchmakingService;
+    private final CosmeticsService cosmeticsService;
     private final AuditSink auditSink;
 
     private ServerCoreRuntime(
@@ -44,6 +47,7 @@ public final class ServerCoreRuntime {
             PlayerStatsService playerStatsService,
             ArenaRegistry arenaRegistry,
             MatchmakingService matchmakingService,
+            CosmeticsService cosmeticsService,
             AuditSink auditSink) {
         this.config = Objects.requireNonNull(config, "config");
         this.portalService = Objects.requireNonNull(portalService, "portalService");
@@ -52,6 +56,7 @@ public final class ServerCoreRuntime {
         this.playerStatsService = Objects.requireNonNull(playerStatsService, "playerStatsService");
         this.arenaRegistry = Objects.requireNonNull(arenaRegistry, "arenaRegistry");
         this.matchmakingService = Objects.requireNonNull(matchmakingService, "matchmakingService");
+        this.cosmeticsService = Objects.requireNonNull(cosmeticsService, "cosmeticsService");
         this.auditSink = Objects.requireNonNull(auditSink, "auditSink");
     }
 
@@ -102,6 +107,8 @@ public final class ServerCoreRuntime {
                 new RatingService(),
                 clock,
                 300);
+        CosmeticsService cosmeticsService = new CosmeticsService(
+                new InMemoryCosmeticRepository());
         AuditSink auditSink = new InMemoryAuditSink();
         auditSink.publish(AuditEvent.system(
                 AuditEventType.CONFIG_LOADED,
@@ -116,6 +123,7 @@ public final class ServerCoreRuntime {
                 playerStatsService,
                 arenaRegistry,
                 matchmakingService,
+                cosmeticsService,
                 auditSink);
     }
 
@@ -145,6 +153,10 @@ public final class ServerCoreRuntime {
 
     public MatchmakingService matchmaking() {
         return matchmakingService;
+    }
+
+    public CosmeticsService cosmetics() {
+        return cosmeticsService;
     }
 
     public AuditSink audit() {
