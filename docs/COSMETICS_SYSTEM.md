@@ -15,15 +15,18 @@ Implemented concepts:
 - One equipped cosmetic per category
 - Grant, revoke, equip, and unequip operations
 - Automatic unequip when ownership is revoked
-- Unit tests for ownership and wardrobe rules
+- Atomic JSON persistence with backup files
+- Unit tests for ownership, wardrobe rules, and restart persistence
 
 The server remains authoritative. A client must never be allowed to claim ownership or equip an item that the server has not granted.
 
 ## Current limitation
 
-The current runtime uses an in-memory cosmetic repository. Ownership and equipped items therefore do not survive a restart yet. This is intentional until the PostgreSQL or JSON persistence layer is selected and tested.
+Cosmetic definitions and player wardrobes now persist to `config/servercore/cosmetics.json`, with the previous valid file retained as `cosmetics.json.bak` when data changes.
 
-The current NeoForge adapter also does not render custom models, textures, outfits, pets, particles, emotes, or animations. Rendering requires a client-side ServerCore module distributed as part of the final custom ATM11 pack.
+JSON is suitable for the private prototype and early testing. PostgreSQL should replace it before a large public launch so grants, purchases, audit history, and concurrent services can use transactional storage.
+
+The current NeoForge adapter does not yet render custom models, textures, outfits, pets, particles, emotes, or animations. Rendering requires a client-side ServerCore module distributed as part of the final custom ATM11 pack.
 
 ## Planned data flow
 
@@ -48,15 +51,15 @@ Client-side ServerCore renderer
 
 ## Required next stages
 
-1. Add persistent cosmetic definitions and player wardrobe storage.
-2. Add staff commands for grant, revoke, enable, disable, inspect, and audit.
-3. Add player commands and a wardrobe protocol.
-4. Add API endpoints for public catalog and owned cosmetics.
-5. Add network packets that synchronize equipped cosmetic IDs to clients.
-6. Build the client-side renderer for titles and nameplates first.
-7. Add original 3D outfit models only after the client module loads reliably.
-8. Add wardrobe preview UI.
-9. Connect achievement, quest, event, founder, and supporter unlock sources.
+1. Add staff commands for grant, revoke, enable, disable, inspect, and audit.
+2. Add player commands and a wardrobe protocol.
+3. Add API endpoints for public catalog and owned cosmetics.
+4. Add network packets that synchronize equipped cosmetic IDs to clients.
+5. Build the client-side renderer for titles and nameplates first.
+6. Add original 3D outfit models only after the client module loads reliably.
+7. Add wardrobe preview UI.
+8. Connect achievement, quest, event, founder, and supporter unlock sources.
+9. Move public-server storage from JSON to PostgreSQL.
 10. Test reconnects, restarts, revoked assets, disabled assets, and multiplayer visibility.
 
 ## Security rules
