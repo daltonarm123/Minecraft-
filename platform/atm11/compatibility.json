@@ -1,0 +1,13 @@
+{
+  "pack": "All The Mods 11",
+  "packRepository": "AllTheMods/ATM-11",
+  "minecraftVersion": "26.1.2",
+  "neoForgeVersion": "26.1.2.76",
+  "javaVersion": 25,
+  "status": "provisional",
+  "notes": [
+    "Pinned to the NeoForge version listed in the current ATM11 mod list.",
+    "Revalidate before every private-server update.",
+    "ServerCore remains platform-independent; the NeoForge adapter is version-specific."
+  ]
+}
