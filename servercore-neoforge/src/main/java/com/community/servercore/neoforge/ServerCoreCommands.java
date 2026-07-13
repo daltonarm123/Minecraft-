@@ -3,8 +3,9 @@ package com.community.servercore.neoforge;
 import com.community.servercore.ServerCoreRuntime;
 import com.community.servercore.command.CommandResult;
 import com.community.servercore.portal.PortalDestination;
-import com.mojang.brigadier.arguments.DoubleArgumentType;
+import com.community.servercore.selection.WorldPosition;
 import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
@@ -27,97 +28,69 @@ final class ServerCoreCommands {
                 .then(Commands.literal("status")
                         .executes(context -> status(context.getSource(), runtimeSupplier))));
 
-        event.getDispatcher().register(Commands.literal("portal")
-                .requires(source -> source.hasPermission(2))
-                .then(Commands.literal("begin")
-                        .then(Commands.argument("name", StringArgumentType.word())
-                                .executes(context -> executePlayer(
-                                        context.getSource(),
-                                        runtimeSupplier,
-                                        (runtime, actor) -> runtime.portalCommands().begin(
-                                                actor,
-                                                StringArgumentType.getString(context, "name"))))))
-                .then(Commands.literal("pos1")
-                        .then(Commands.argument("name", StringArgumentType.word())
-                                .executes(context -> executePlayer(
-                                        context.getSource(),
-                                        runtimeSupplier,
-                                        (runtime, actor) -> runtime.portalCommands().setFirst(
-                                                actor,
-                                                StringArgumentType.getString(context, "name"))))))
-                .then(Commands.literal("pos2")
-                        .then(Commands.argument("name", StringArgumentType.word())
-                                .executes(context -> executePlayer(
-                                        context.getSource(),
-                                        runtimeSupplier,
-                                        (runtime, actor) -> runtime.portalCommands().setSecond(
-                                                actor,
-                                                StringArgumentType.getString(context, "name"))))))
-                .then(Commands.literal("create")
-                        .then(Commands.argument("name", StringArgumentType.word())
-                                .then(Commands.literal("location")
-                                        .then(Commands.argument("world", StringArgumentType.string())
-                                                .then(Commands.argument("x", DoubleArgumentType.doubleArg())
-                                                        .then(Commands.argument("y", DoubleArgumentType.doubleArg())
-                                                                .then(Commands.argument("z", DoubleArgumentType.doubleArg())
-                                                                        .executes(context -> executePlayer(
-                                                                                context.getSource(),
-                                                                                runtimeSupplier,
-                                                                                (runtime, actor) -> {
-                                                                                    String name = StringArgumentType.getString(context, "name");
-                                                                                    PortalDestination destination = PortalDestination.location(
-                                                                                            StringArgumentType.getString(context, "world"),
-                                                                                            DoubleArgumentType.getDouble(context, "x"),
-                                                                                            DoubleArgumentType.getDouble(context, "y"),
-                                                                                            DoubleArgumentType.getDouble(context, "z"),
-                                                                                            0.0F,
-                                                                                            0.0F);
-                                                                                    return runtime.portalCommands().create(
-                                                                                            actor,
-                                                                                            name,
-                                                                                            name,
-                                                                                            destination,
-                                                                                            "");
-                                                                                }))))))))))
-                .then(Commands.literal("list")
+        LiteralArgumentBuilder<CommandSourceStack> portal = Commands.literal("portal");
+        portal.requires(source -> source.hasPermission(2));
+
+        portal.then(namedPlayerCommand("begin", runtimeSupplier,
+                (runtime, actor, name) -> runtime.portalCommands().begin(actor, name)));
+        portal.then(namedPlayerCommand("pos1", runtimeSupplier,
+                (runtime, actor, name) -> runtime.portalCommands().setFirst(actor, name)));
+        portal.then(namedPlayerCommand("pos2", runtimeSupplier,
+                (runtime, actor, name) -> runtime.portalCommands().setSecond(actor, name)));
+        portal.then(namedPlayerCommand("info", runtimeSupplier,
+                (runtime, actor, name) -> runtime.portalCommands().info(actor, name)));
+        portal.then(namedPlayerCommand("delete", runtimeSupplier,
+                (runtime, actor, name) -> runtime.portalCommands().delete(actor, name)));
+        portal.then(namedPlayerCommand("enable", runtimeSupplier,
+                (runtime, actor, name) -> runtime.portalCommands().setEnabled(actor, name, true)));
+        portal.then(namedPlayerCommand("disable", runtimeSupplier,
+                (runtime, actor, name) -> runtime.portalCommands().setEnabled(actor, name, false)));
+
+        portal.then(Commands.literal("create")
+                .then(Commands.argument("name", StringArgumentType.word())
                         .executes(context -> executePlayer(
                                 context.getSource(),
                                 runtimeSupplier,
-                                (runtime, actor) -> runtime.portalCommands().list(actor))))
-                .then(Commands.literal("info")
-                        .then(Commands.argument("name", StringArgumentType.word())
-                                .executes(context -> executePlayer(
-                                        context.getSource(),
-                                        runtimeSupplier,
-                                        (runtime, actor) -> runtime.portalCommands().info(
-                                                actor,
-                                                StringArgumentType.getString(context, "name"))))))
-                .then(Commands.literal("delete")
-                        .then(Commands.argument("name", StringArgumentType.word())
-                                .executes(context -> executePlayer(
-                                        context.getSource(),
-                                        runtimeSupplier,
-                                        (runtime, actor) -> runtime.portalCommands().delete(
-                                                actor,
-                                                StringArgumentType.getString(context, "name"))))))
-                .then(Commands.literal("enable")
-                        .then(Commands.argument("name", StringArgumentType.word())
-                                .executes(context -> executePlayer(
-                                        context.getSource(),
-                                        runtimeSupplier,
-                                        (runtime, actor) -> runtime.portalCommands().setEnabled(
-                                                actor,
-                                                StringArgumentType.getString(context, "name"),
-                                                true)))))
-                .then(Commands.literal("disable")
-                        .then(Commands.argument("name", StringArgumentType.word())
-                                .executes(context -> executePlayer(
-                                        context.getSource(),
-                                        runtimeSupplier,
-                                        (runtime, actor) -> runtime.portalCommands().setEnabled(
-                                                actor,
-                                                StringArgumentType.getString(context, "name"),
-                                                false))))));
+                                (runtime, actor) -> {
+                                    String name = StringArgumentType.getString(context, "name");
+                                    WorldPosition position = actor.position();
+                                    PortalDestination destination = PortalDestination.location(
+                                            position.world(),
+                                            position.x(),
+                                            position.y(),
+                                            position.z(),
+                                            0.0F,
+                                            0.0F);
+                                    return runtime.portalCommands().create(
+                                            actor,
+                                            name,
+                                            name,
+                                            destination,
+                                            "");
+                                }))));
+
+        portal.then(Commands.literal("list")
+                .executes(context -> executePlayer(
+                        context.getSource(),
+                        runtimeSupplier,
+                        (runtime, actor) -> runtime.portalCommands().list(actor))));
+
+        event.getDispatcher().register(portal);
+    }
+
+    private static LiteralArgumentBuilder<CommandSourceStack> namedPlayerCommand(
+            String literal,
+            Supplier<ServerCoreRuntime> runtimeSupplier,
+            NamedPlayerCommand command) {
+        return Commands.literal(literal)
+                .then(Commands.argument("name", StringArgumentType.word())
+                        .executes(context -> executePlayer(
+                                context.getSource(),
+                                runtimeSupplier,
+                                (runtime, actor) -> command.execute(
+                                        runtime,
+                                        actor,
+                                        StringArgumentType.getString(context, "name")))));
     }
 
     private static int status(CommandSourceStack source, Supplier<ServerCoreRuntime> runtimeSupplier) {
@@ -155,5 +128,10 @@ final class ServerCoreCommands {
     @FunctionalInterface
     private interface PlayerCommand {
         CommandResult execute(ServerCoreRuntime runtime, NeoForgeCommandActor actor);
+    }
+
+    @FunctionalInterface
+    private interface NamedPlayerCommand {
+        CommandResult execute(ServerCoreRuntime runtime, NeoForgeCommandActor actor, String name);
     }
 }
