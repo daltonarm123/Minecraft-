@@ -35,8 +35,8 @@ PostgreSQL
 
 ```bash
 cd server-core
-./gradlew test
-./gradlew build
+gradle test
+gradle build
 ```
 
 The built JAR will appear under `server-core/build/libs/`.
