@@ -5,6 +5,7 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, status
+from fastapi.middleware.cors import CORSMiddleware
 
 from .models import (
     AuditEventCreate,
@@ -18,6 +19,14 @@ from .store import NetworkStore, store as default_store
 
 SERVICE_VERSION = "0.1.0"
 API_KEY = os.getenv("SERVERCORE_API_KEY", "").strip()
+ALLOWED_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv(
+        "SERVERCORE_ALLOWED_ORIGINS",
+        "http://localhost:8080,http://127.0.0.1:8080",
+    ).split(",")
+    if origin.strip()
+]
 
 
 def require_write_key(
@@ -36,6 +45,13 @@ def create_app(network_store: NetworkStore | None = None) -> FastAPI:
         title="ServerCore Network API",
         version=SERVICE_VERSION,
         description="Internal service for player profiles, duels, leaderboards, and audit events.",
+    )
+    application.add_middleware(
+        CORSMiddleware,
+        allow_origins=ALLOWED_ORIGINS,
+        allow_credentials=False,
+        allow_methods=["GET", "POST", "PUT", "OPTIONS"],
+        allow_headers=["Accept", "Content-Type", "X-ServerCore-Key"],
     )
 
     @application.get("/health", response_model=HealthResponse)
