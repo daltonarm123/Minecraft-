@@ -1,6 +1,5 @@
 package com.community.servercore.neoforge;
 
-import com.community.servercore.portal.Portal;
 import com.community.servercore.service.PortalAccessService;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
@@ -17,10 +16,9 @@ final class NeoForgePortalAccessService implements PortalAccessService {
     }
 
     @Override
-    public boolean canUse(UUID playerId, Portal portal) {
+    public boolean hasPermission(UUID playerId, String permission) {
         Objects.requireNonNull(playerId, "playerId");
-        Objects.requireNonNull(portal, "portal");
-        if (portal.permission().isBlank()) {
+        if (permission == null || permission.isBlank()) {
             return true;
         }
         MinecraftServer server = serverSupplier.get();
