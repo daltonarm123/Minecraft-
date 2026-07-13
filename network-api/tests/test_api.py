@@ -17,7 +17,7 @@ def test_health() -> None:
     assert response.json()["status"] == "ok"
 
 
-def test_player_upsert_and_leaderboard() -> None:
+def test_player_upsert_leaderboard_and_username_lookup() -> None:
     api = client()
     first_id = uuid4()
     second_id = uuid4()
@@ -44,11 +44,14 @@ def test_player_upsert_and_leaderboard() -> None:
     assert api.put(f"/players/{first_id}", json=first).status_code == 200
     assert api.put(f"/players/{second_id}", json=second).status_code == 200
     leaderboard = api.get("/leaderboard?limit=10")
+    lookup = api.get("/players/by-name/second")
 
     assert leaderboard.status_code == 200
     body = leaderboard.json()
     assert [entry["username"] for entry in body] == ["Second", "First"]
     assert body[0]["rank"] == 1
+    assert lookup.status_code == 200
+    assert lookup.json()["player_id"] == str(second_id)
 
 
 def test_rejects_player_path_mismatch() -> None:
