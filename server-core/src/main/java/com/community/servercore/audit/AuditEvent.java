@@ -26,4 +26,21 @@ public record AuditEvent(
     public static AuditEvent system(AuditEventType type, Instant now, String message) {
         return new AuditEvent(UUID.randomUUID(), type, now, null, "system", message, Map.of());
     }
+
+    public static AuditEvent actor(
+            AuditEventType type,
+            Instant now,
+            UUID actorId,
+            String actorName,
+            String message,
+            Map<String, String> attributes) {
+        return new AuditEvent(
+                UUID.randomUUID(),
+                type,
+                now,
+                Objects.requireNonNull(actorId, "actorId"),
+                actorName,
+                message,
+                attributes);
+    }
 }

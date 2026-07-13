@@ -35,6 +35,13 @@ public final class InMemoryCosmeticRepository implements CosmeticRepository {
     }
 
     @Override
+    public List<CosmeticPlayerState> listPlayerStates() {
+        return playerStates.values().stream()
+                .sorted(Comparator.comparing(state -> state.playerId().toString()))
+                .toList();
+    }
+
+    @Override
     public void savePlayerState(CosmeticPlayerState state) {
         playerStates.put(state.playerId(), state);
     }

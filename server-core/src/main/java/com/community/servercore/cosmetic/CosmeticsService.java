@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -25,6 +26,15 @@ public final class CosmeticsService {
         return definition;
     }
 
+    public synchronized boolean registerIfAbsent(CosmeticDefinition definition) {
+        Objects.requireNonNull(definition, "definition");
+        if (repository.findDefinition(definition.id()).isPresent()) {
+            return false;
+        }
+        repository.saveDefinition(definition);
+        return true;
+    }
+
     public synchronized CosmeticDefinition updateDefinition(CosmeticDefinition definition) {
         Objects.requireNonNull(definition, "definition");
         requireDefinition(definition.id());
@@ -35,7 +45,14 @@ public final class CosmeticsService {
     public synchronized CosmeticDefinition setEnabled(String cosmeticId, boolean enabled) {
         CosmeticDefinition updated = requireDefinition(cosmeticId).withEnabled(enabled);
         repository.saveDefinition(updated);
+        if (!enabled) {
+            unequipForAllPlayers(updated.id());
+        }
         return updated;
+    }
+
+    public Optional<CosmeticDefinition> findDefinition(String cosmeticId) {
+        return repository.findDefinition(normalizeId(cosmeticId));
     }
 
     public List<CosmeticDefinition> listDefinitions(boolean includeDisabled) {
@@ -129,6 +146,23 @@ public final class CosmeticsService {
         return equipped.values().stream()
                 .map(this::requireDefinition)
                 .toList();
+    }
+
+    private void unequipForAllPlayers(String cosmeticId) {
+        for (CosmeticPlayerState current : repository.listPlayerStates()) {
+            boolean equipped = current.equippedByCategory().containsValue(cosmeticId);
+            if (!equipped) {
+                continue;
+            }
+            EnumMap<CosmeticCategory, String> updatedEquipment =
+                    new EnumMap<>(CosmeticCategory.class);
+            updatedEquipment.putAll(current.equippedByCategory());
+            updatedEquipment.entrySet().removeIf(entry -> entry.getValue().equals(cosmeticId));
+            repository.savePlayerState(new CosmeticPlayerState(
+                    current.playerId(),
+                    current.ownedCosmeticIds(),
+                    updatedEquipment));
+        }
     }
 
     private CosmeticDefinition requireDefinition(String cosmeticId) {

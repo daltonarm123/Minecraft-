@@ -13,5 +13,7 @@ public interface CosmeticRepository {
 
     CosmeticPlayerState loadPlayerState(UUID playerId);
 
+    List<CosmeticPlayerState> listPlayerStates();
+
     void savePlayerState(CosmeticPlayerState state);
 }

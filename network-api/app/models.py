@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from enum import StrEnum
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 def utc_now() -> datetime:
@@ -14,6 +14,49 @@ def utc_now() -> datetime:
 class DuelMode(StrEnum):
     CASUAL = "CASUAL"
     RANKED = "RANKED"
+
+
+class CosmeticCategory(StrEnum):
+    OUTFIT = "OUTFIT"
+    HEAD = "HEAD"
+    BACK = "BACK"
+    SHOULDER = "SHOULDER"
+    WEAPON = "WEAPON"
+    TOOL = "TOOL"
+    TRAIL = "TRAIL"
+    FOOTSTEP = "FOOTSTEP"
+    SPAWN_EFFECT = "SPAWN_EFFECT"
+    TELEPORT_EFFECT = "TELEPORT_EFFECT"
+    VICTORY_POSE = "VICTORY_POSE"
+    EMOTE = "EMOTE"
+    NAME_COLOR = "NAME_COLOR"
+    TITLE = "TITLE"
+    NAMEPLATE = "NAMEPLATE"
+    PET = "PET"
+
+
+class CosmeticRarity(StrEnum):
+    COMMON = "COMMON"
+    UNCOMMON = "UNCOMMON"
+    RARE = "RARE"
+    EPIC = "EPIC"
+    LEGENDARY = "LEGENDARY"
+    MYTHIC = "MYTHIC"
+    EVENT = "EVENT"
+
+
+class CosmeticUnlockSource(StrEnum):
+    DEFAULT = "DEFAULT"
+    ACHIEVEMENT = "ACHIEVEMENT"
+    QUEST = "QUEST"
+    SEASON = "SEASON"
+    EVENT = "EVENT"
+    BOSS_DROP = "BOSS_DROP"
+    BLUEPRINT = "BLUEPRINT"
+    FACTION = "FACTION"
+    FOUNDER = "FOUNDER"
+    SUPPORTER = "SUPPORTER"
+    STAFF = "STAFF"
 
 
 class PlayerUpsert(BaseModel):
@@ -86,6 +129,63 @@ class AuditEventCreate(BaseModel):
     actor_name: str = Field(default="system", max_length=64)
     message: str = Field(default="", max_length=2000)
     attributes: dict[str, str] = Field(default_factory=dict)
+
+
+class CosmeticDefinition(BaseModel):
+    cosmetic_id: str = Field(min_length=1, max_length=64)
+    display_name: str = Field(min_length=1, max_length=80)
+    category: CosmeticCategory
+    rarity: CosmeticRarity
+    unlock_source: CosmeticUnlockSource
+    asset_id: str = Field(min_length=3, max_length=160)
+    description: str = Field(default="", max_length=500)
+    enabled: bool = True
+    tags: set[str] = Field(default_factory=set)
+
+    @field_validator("cosmetic_id")
+    @classmethod
+    def normalize_cosmetic_id(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if not normalized or any(
+            character not in "abcdefghijklmnopqrstuvwxyz0123456789_.-"
+            for character in normalized
+        ):
+            raise ValueError("cosmetic_id contains invalid characters")
+        return normalized
+
+    @field_validator("asset_id")
+    @classmethod
+    def validate_asset_id(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if normalized.count(":") != 1:
+            raise ValueError("asset_id must use namespace:path")
+        namespace, path = normalized.split(":", 1)
+        allowed_namespace = "abcdefghijklmnopqrstuvwxyz0123456789_.-"
+        allowed_path = allowed_namespace + "/"
+        if not namespace or not path:
+            raise ValueError("asset_id must use namespace:path")
+        if any(character not in allowed_namespace for character in namespace):
+            raise ValueError("asset_id namespace contains invalid characters")
+        if any(character not in allowed_path for character in path):
+            raise ValueError("asset_id path contains invalid characters")
+        return normalized
+
+    @field_validator("tags")
+    @classmethod
+    def normalize_tags(cls, values: set[str]) -> set[str]:
+        normalized: set[str] = set()
+        for value in values:
+            tag = value.strip().lower()
+            if not tag or len(tag) > 64:
+                raise ValueError("tags must contain 1 to 64 characters")
+            normalized.add(tag)
+        return normalized
+
+
+class CosmeticPlayerState(BaseModel):
+    player_id: UUID
+    owned_cosmetic_ids: set[str] = Field(default_factory=set)
+    equipped_by_category: dict[CosmeticCategory, str] = Field(default_factory=dict)
 
 
 class HealthResponse(BaseModel):

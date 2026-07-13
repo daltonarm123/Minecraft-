@@ -5,6 +5,9 @@ from uuid import UUID
 
 from .models import (
     AuditEventCreate,
+    CosmeticCategory,
+    CosmeticDefinition,
+    CosmeticPlayerState,
     LeaderboardEntry,
     MatchCreate,
     PlayerRecord,
@@ -22,6 +25,8 @@ class NetworkStore:
         self._players: dict[UUID, PlayerRecord] = {}
         self._matches: dict[UUID, MatchCreate] = {}
         self._events: list[AuditEventCreate] = []
+        self._cosmetics: dict[str, CosmeticDefinition] = {}
+        self._wardrobes: dict[UUID, CosmeticPlayerState] = {}
         self._maximum_events = maximum_events
 
     def upsert_player(self, player: PlayerUpsert) -> PlayerRecord:
@@ -96,6 +101,131 @@ class NetworkStore:
             raise ValueError("limit must be between 1 and 1000")
         with self._lock:
             return [event.model_copy(deep=True) for event in self._events[:limit]]
+
+    def upsert_cosmetic(self, definition: CosmeticDefinition) -> CosmeticDefinition:
+        with self._lock:
+            self._cosmetics[definition.cosmetic_id] = definition.model_copy(deep=True)
+            if not definition.enabled:
+                self._unequip_cosmetic_from_all_players(definition.cosmetic_id)
+            return definition.model_copy(deep=True)
+
+    def get_cosmetic(self, cosmetic_id: str) -> CosmeticDefinition | None:
+        with self._lock:
+            definition = self._cosmetics.get(self._normalize_cosmetic_id(cosmetic_id))
+            return None if definition is None else definition.model_copy(deep=True)
+
+    def list_cosmetics(self, *, include_disabled: bool = False) -> list[CosmeticDefinition]:
+        with self._lock:
+            definitions = sorted(
+                self._cosmetics.values(),
+                key=lambda definition: (definition.category.value, definition.cosmetic_id),
+            )
+            return [
+                definition.model_copy(deep=True)
+                for definition in definitions
+                if include_disabled or definition.enabled
+            ]
+
+    def get_wardrobe(self, player_id: UUID) -> CosmeticPlayerState:
+        with self._lock:
+            state = self._wardrobes.get(player_id)
+            if state is None:
+                state = CosmeticPlayerState(player_id=player_id)
+            return state.model_copy(deep=True)
+
+    def grant_cosmetic(self, player_id: UUID, cosmetic_id: str) -> CosmeticPlayerState:
+        normalized = self._normalize_cosmetic_id(cosmetic_id)
+        with self._lock:
+            if normalized not in self._cosmetics:
+                raise KeyError(f"Cosmetic not found: {normalized}")
+            current = self._wardrobes.get(player_id, CosmeticPlayerState(player_id=player_id))
+            owned = set(current.owned_cosmetic_ids)
+            owned.add(normalized)
+            updated = CosmeticPlayerState(
+                player_id=player_id,
+                owned_cosmetic_ids=owned,
+                equipped_by_category=dict(current.equipped_by_category),
+            )
+            self._wardrobes[player_id] = updated
+            return updated.model_copy(deep=True)
+
+    def revoke_cosmetic(self, player_id: UUID, cosmetic_id: str) -> CosmeticPlayerState:
+        normalized = self._normalize_cosmetic_id(cosmetic_id)
+        with self._lock:
+            current = self._wardrobes.get(player_id, CosmeticPlayerState(player_id=player_id))
+            owned = set(current.owned_cosmetic_ids)
+            owned.discard(normalized)
+            equipped = {
+                category: equipped_id
+                for category, equipped_id in current.equipped_by_category.items()
+                if equipped_id != normalized
+            }
+            updated = CosmeticPlayerState(
+                player_id=player_id,
+                owned_cosmetic_ids=owned,
+                equipped_by_category=equipped,
+            )
+            self._wardrobes[player_id] = updated
+            return updated.model_copy(deep=True)
+
+    def equip_cosmetic(self, player_id: UUID, cosmetic_id: str) -> CosmeticPlayerState:
+        normalized = self._normalize_cosmetic_id(cosmetic_id)
+        with self._lock:
+            definition = self._cosmetics.get(normalized)
+            if definition is None:
+                raise KeyError(f"Cosmetic not found: {normalized}")
+            if not definition.enabled:
+                raise ValueError(f"Cosmetic is disabled: {normalized}")
+            current = self._wardrobes.get(player_id, CosmeticPlayerState(player_id=player_id))
+            if normalized not in current.owned_cosmetic_ids:
+                raise ValueError(f"Player does not own cosmetic: {normalized}")
+            equipped = dict(current.equipped_by_category)
+            equipped[definition.category] = normalized
+            updated = CosmeticPlayerState(
+                player_id=player_id,
+                owned_cosmetic_ids=set(current.owned_cosmetic_ids),
+                equipped_by_category=equipped,
+            )
+            self._wardrobes[player_id] = updated
+            return updated.model_copy(deep=True)
+
+    def unequip_category(
+        self,
+        player_id: UUID,
+        category: CosmeticCategory,
+    ) -> CosmeticPlayerState:
+        with self._lock:
+            current = self._wardrobes.get(player_id, CosmeticPlayerState(player_id=player_id))
+            equipped = dict(current.equipped_by_category)
+            equipped.pop(category, None)
+            updated = CosmeticPlayerState(
+                player_id=player_id,
+                owned_cosmetic_ids=set(current.owned_cosmetic_ids),
+                equipped_by_category=equipped,
+            )
+            self._wardrobes[player_id] = updated
+            return updated.model_copy(deep=True)
+
+    def _unequip_cosmetic_from_all_players(self, cosmetic_id: str) -> None:
+        for player_id, current in list(self._wardrobes.items()):
+            equipped = {
+                category: equipped_id
+                for category, equipped_id in current.equipped_by_category.items()
+                if equipped_id != cosmetic_id
+            }
+            if equipped != current.equipped_by_category:
+                self._wardrobes[player_id] = CosmeticPlayerState(
+                    player_id=player_id,
+                    owned_cosmetic_ids=set(current.owned_cosmetic_ids),
+                    equipped_by_category=equipped,
+                )
+
+    @staticmethod
+    def _normalize_cosmetic_id(cosmetic_id: str) -> str:
+        normalized = cosmetic_id.strip().lower()
+        if not normalized:
+            raise ValueError("cosmetic_id must not be blank")
+        return normalized
 
 
 store = NetworkStore()

@@ -59,6 +59,13 @@ public final class JsonCosmeticRepository implements CosmeticRepository {
     }
 
     @Override
+    public synchronized List<CosmeticPlayerState> listPlayerStates() {
+        return playerStates.values().stream()
+                .sorted(Comparator.comparing(state -> state.playerId().toString()))
+                .toList();
+    }
+
+    @Override
     public synchronized void savePlayerState(CosmeticPlayerState state) {
         playerStates.put(state.playerId(), state);
         persistUnchecked();

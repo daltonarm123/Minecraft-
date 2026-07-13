@@ -2,6 +2,7 @@ package com.community.servercore.cosmetic;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -67,14 +68,22 @@ class CosmeticsServiceTest {
     }
 
     @Test
-    void disabledCosmeticCannotBeEquipped() {
+    void disablingCosmeticUnequipsItForAllPlayers() {
         CosmeticsService service = serviceWith(
                 cosmetic("founder-crown", CosmeticCategory.HEAD, true));
-        UUID playerId = UUID.randomUUID();
-        service.grant(playerId, "founder-crown");
+        UUID firstPlayer = UUID.randomUUID();
+        UUID secondPlayer = UUID.randomUUID();
+        service.grant(firstPlayer, "founder-crown");
+        service.grant(secondPlayer, "founder-crown");
+        service.equip(firstPlayer, "founder-crown");
+        service.equip(secondPlayer, "founder-crown");
+
         service.setEnabled("founder-crown", false);
 
-        assertThatThrownBy(() -> service.equip(playerId, "founder-crown"))
+        assertThat(service.state(firstPlayer).equippedByCategory()).isEmpty();
+        assertThat(service.state(secondPlayer).equippedByCategory()).isEmpty();
+        assertThat(service.state(firstPlayer).ownedCosmeticIds()).contains("founder-crown");
+        assertThatThrownBy(() -> service.equip(firstPlayer, "founder-crown"))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("disabled");
     }
@@ -88,6 +97,19 @@ class CosmeticsServiceTest {
         assertThatThrownBy(() -> service.registerDefinition(definition))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("already exists");
+        assertThat(service.registerIfAbsent(definition)).isFalse();
+    }
+
+    @Test
+    void rejectsEquippedCosmeticThatIsNotOwned() {
+        UUID playerId = UUID.randomUUID();
+
+        assertThatThrownBy(() -> new CosmeticPlayerState(
+                playerId,
+                Set.of(),
+                Map.of(CosmeticCategory.HEAD, "founder-crown")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("must also be owned");
     }
 
     private static CosmeticsService serviceWith(CosmeticDefinition... definitions) {

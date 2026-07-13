@@ -4,10 +4,12 @@ import com.community.servercore.audit.AuditEvent;
 import com.community.servercore.audit.AuditEventType;
 import com.community.servercore.audit.AuditSink;
 import com.community.servercore.audit.InMemoryAuditSink;
+import com.community.servercore.command.CosmeticCommandService;
 import com.community.servercore.command.PortalCommandService;
 import com.community.servercore.config.JsonConfigLoader;
 import com.community.servercore.config.ServerCoreConfig;
 import com.community.servercore.cosmetic.CosmeticsService;
+import com.community.servercore.cosmetic.DefaultCosmeticCatalog;
 import com.community.servercore.cosmetic.JsonCosmeticRepository;
 import com.community.servercore.duel.ArenaRegistry;
 import com.community.servercore.duel.MatchmakingService;
@@ -37,6 +39,7 @@ public final class ServerCoreRuntime {
     private final ArenaRegistry arenaRegistry;
     private final MatchmakingService matchmakingService;
     private final CosmeticsService cosmeticsService;
+    private final CosmeticCommandService cosmeticCommandService;
     private final AuditSink auditSink;
 
     private ServerCoreRuntime(
@@ -48,6 +51,7 @@ public final class ServerCoreRuntime {
             ArenaRegistry arenaRegistry,
             MatchmakingService matchmakingService,
             CosmeticsService cosmeticsService,
+            CosmeticCommandService cosmeticCommandService,
             AuditSink auditSink) {
         this.config = Objects.requireNonNull(config, "config");
         this.portalService = Objects.requireNonNull(portalService, "portalService");
@@ -57,6 +61,7 @@ public final class ServerCoreRuntime {
         this.arenaRegistry = Objects.requireNonNull(arenaRegistry, "arenaRegistry");
         this.matchmakingService = Objects.requireNonNull(matchmakingService, "matchmakingService");
         this.cosmeticsService = Objects.requireNonNull(cosmeticsService, "cosmeticsService");
+        this.cosmeticCommandService = Objects.requireNonNull(cosmeticCommandService, "cosmeticCommandService");
         this.auditSink = Objects.requireNonNull(auditSink, "auditSink");
     }
 
@@ -92,7 +97,7 @@ public final class ServerCoreRuntime {
                 teleportService,
                 config.allowOverlappingPortals());
         PortalSelectionService selectionService = new PortalSelectionService(clock);
-        PortalCommandService commandService = new PortalCommandService(
+        PortalCommandService portalCommandService = new PortalCommandService(
                 portalService,
                 selectionService,
                 config.maximumPortals(),
@@ -107,23 +112,35 @@ public final class ServerCoreRuntime {
                 new RatingService(),
                 clock,
                 300);
+        AuditSink auditSink = new InMemoryAuditSink();
         CosmeticsService cosmeticsService = new CosmeticsService(
                 new JsonCosmeticRepository(normalizedDirectory.resolve("cosmetics.json")));
-        AuditSink auditSink = new InMemoryAuditSink();
+        int seededCosmetics = DefaultCosmeticCatalog.seed(cosmeticsService);
+        CosmeticCommandService cosmeticCommandService = new CosmeticCommandService(
+                cosmeticsService,
+                auditSink);
+
         auditSink.publish(AuditEvent.system(
                 AuditEventType.CONFIG_LOADED,
                 clock.instant(),
                 "Loaded ServerCore configuration from " + normalizedDirectory));
+        if (seededCosmetics > 0) {
+            auditSink.publish(AuditEvent.system(
+                    AuditEventType.COSMETIC_REGISTERED,
+                    clock.instant(),
+                    "Seeded " + seededCosmetics + " default cosmetic definitions"));
+        }
 
         return new ServerCoreRuntime(
                 config,
                 portalService,
                 selectionService,
-                commandService,
+                portalCommandService,
                 playerStatsService,
                 arenaRegistry,
                 matchmakingService,
                 cosmeticsService,
+                cosmeticCommandService,
                 auditSink);
     }
 
@@ -157,6 +174,10 @@ public final class ServerCoreRuntime {
 
     public CosmeticsService cosmetics() {
         return cosmeticsService;
+    }
+
+    public CosmeticCommandService cosmeticCommands() {
+        return cosmeticCommandService;
     }
 
     public AuditSink audit() {

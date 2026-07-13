@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from typing import Annotated
+from typing import Annotated, NoReturn
 from uuid import UUID
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, status
@@ -9,6 +9,9 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .models import (
     AuditEventCreate,
+    CosmeticCategory,
+    CosmeticDefinition,
+    CosmeticPlayerState,
     HealthResponse,
     LeaderboardEntry,
     MatchCreate,
@@ -17,7 +20,7 @@ from .models import (
 )
 from .store import NetworkStore, store as default_store
 
-SERVICE_VERSION = "0.1.0"
+SERVICE_VERSION = "0.2.0"
 API_KEY = os.getenv("SERVERCORE_API_KEY", "").strip()
 ALLOWED_ORIGINS = [
     origin.strip()
@@ -39,18 +42,28 @@ def require_write_key(
         )
 
 
+def raise_store_error(exception: Exception) -> NoReturn:
+    if isinstance(exception, KeyError):
+        detail = exception.args[0] if exception.args else "Record not found"
+        raise HTTPException(status_code=404, detail=detail) from exception
+    raise HTTPException(status_code=400, detail=str(exception)) from exception
+
+
 def create_app(network_store: NetworkStore | None = None) -> FastAPI:
     active_store = network_store or default_store
     application = FastAPI(
         title="ServerCore Network API",
         version=SERVICE_VERSION,
-        description="Internal service for player profiles, duels, leaderboards, and audit events.",
+        description=(
+            "Internal service for player profiles, duels, cosmetics, leaderboards, "
+            "and audit events."
+        ),
     )
     application.add_middleware(
         CORSMiddleware,
         allow_origins=ALLOWED_ORIGINS,
         allow_credentials=False,
-        allow_methods=["GET", "POST", "PUT", "OPTIONS"],
+        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         allow_headers=["Accept", "Content-Type", "X-ServerCore-Key"],
     )
 
@@ -119,6 +132,81 @@ def create_app(network_store: NetworkStore | None = None) -> FastAPI:
     @application.get("/events", response_model=list[AuditEventCreate])
     def recent_events(limit: Annotated[int, Query(ge=1, le=1000)] = 100) -> list[AuditEventCreate]:
         return active_store.recent_events(limit)
+
+    @application.get("/cosmetics", response_model=list[CosmeticDefinition])
+    def cosmetic_catalog(include_disabled: bool = False) -> list[CosmeticDefinition]:
+        return active_store.list_cosmetics(include_disabled=include_disabled)
+
+    @application.get("/cosmetics/{cosmetic_id}", response_model=CosmeticDefinition)
+    def cosmetic_definition(cosmetic_id: str) -> CosmeticDefinition:
+        definition = active_store.get_cosmetic(cosmetic_id)
+        if definition is None:
+            raise HTTPException(status_code=404, detail="Cosmetic not found")
+        return definition
+
+    @application.put(
+        "/cosmetics/{cosmetic_id}",
+        response_model=CosmeticDefinition,
+        dependencies=[Depends(require_write_key)],
+    )
+    def upsert_cosmetic(
+        cosmetic_id: str,
+        payload: CosmeticDefinition,
+    ) -> CosmeticDefinition:
+        if cosmetic_id.strip().lower() != payload.cosmetic_id:
+            raise HTTPException(status_code=400, detail="Path and payload cosmetic IDs must match")
+        return active_store.upsert_cosmetic(payload)
+
+    @application.get(
+        "/players/{player_id}/cosmetics",
+        response_model=CosmeticPlayerState,
+    )
+    def player_cosmetics(player_id: UUID) -> CosmeticPlayerState:
+        return active_store.get_wardrobe(player_id)
+
+    @application.post(
+        "/players/{player_id}/cosmetics/{cosmetic_id}/grant",
+        response_model=CosmeticPlayerState,
+        dependencies=[Depends(require_write_key)],
+    )
+    def grant_cosmetic(player_id: UUID, cosmetic_id: str) -> CosmeticPlayerState:
+        try:
+            return active_store.grant_cosmetic(player_id, cosmetic_id)
+        except (KeyError, ValueError) as exception:
+            raise_store_error(exception)
+
+    @application.delete(
+        "/players/{player_id}/cosmetics/{cosmetic_id}",
+        response_model=CosmeticPlayerState,
+        dependencies=[Depends(require_write_key)],
+    )
+    def revoke_cosmetic(player_id: UUID, cosmetic_id: str) -> CosmeticPlayerState:
+        try:
+            return active_store.revoke_cosmetic(player_id, cosmetic_id)
+        except ValueError as exception:
+            raise_store_error(exception)
+
+    @application.put(
+        "/players/{player_id}/cosmetics/{cosmetic_id}/equip",
+        response_model=CosmeticPlayerState,
+        dependencies=[Depends(require_write_key)],
+    )
+    def equip_cosmetic(player_id: UUID, cosmetic_id: str) -> CosmeticPlayerState:
+        try:
+            return active_store.equip_cosmetic(player_id, cosmetic_id)
+        except (KeyError, ValueError) as exception:
+            raise_store_error(exception)
+
+    @application.delete(
+        "/players/{player_id}/cosmetics/categories/{category}",
+        response_model=CosmeticPlayerState,
+        dependencies=[Depends(require_write_key)],
+    )
+    def unequip_cosmetic_category(
+        player_id: UUID,
+        category: CosmeticCategory,
+    ) -> CosmeticPlayerState:
+        return active_store.unequip_category(player_id, category)
 
     return application
 
