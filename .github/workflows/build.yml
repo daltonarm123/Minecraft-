@@ -23,15 +23,32 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
-          cache: gradle
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
       - name: Test and build
-        run: gradle clean test build
+        id: gradle-build
+        shell: bash
+        run: |
+          set +e
+          gradle --version > build.log 2>&1
+          gradle clean test build >> build.log 2>&1
+          exit_code=$?
+          cat build.log
+          echo "exit_code=$exit_code" >> "$GITHUB_OUTPUT"
+          exit "$exit_code"
+
+      - name: Upload diagnostic log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: server-core-diagnostics
+          path: server-core/build.log
+          if-no-files-found: warn
 
       - name: Upload build artifacts
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: server-core-build
