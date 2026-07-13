@@ -40,7 +40,7 @@ Revalidate these values before updating the ATM11 server pack. See `platform/atm
   - `/portal begin <name>`
   - `/portal pos1 <name>`
   - `/portal pos2 <name>`
-  - `/portal create <name> location <world> <x> <y> <z>`
+  - `/portal create <name>` — run while standing at the destination where players should arrive
   - `/portal list`
   - `/portal info <name>`
   - `/portal delete <name>`
