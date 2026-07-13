@@ -1,0 +1,1 @@
+"""ServerCore Discord bot package."""

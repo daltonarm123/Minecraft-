@@ -1,0 +1,25 @@
+license="${mod_license}"
+issueTrackerURL="https://github.com/daltonarm123/Minecraft-/issues"
+
+[[mods]]
+modId="${mod_id}"
+version="${mod_version}"
+displayName="${mod_name}"
+authors="Dalton Armstrong"
+description='''
+Custom portal, hub, duel, statistics, and administration systems for the community All The Mods 11 server.
+'''
+
+[[dependencies.${mod_id}]]
+modId="neoforge"
+type="required"
+versionRange="[${neo_version},)"
+ordering="NONE"
+side="SERVER"
+
+[[dependencies.${mod_id}]]
+modId="minecraft"
+type="required"
+versionRange="${minecraft_version_range}"
+ordering="NONE"
+side="SERVER"

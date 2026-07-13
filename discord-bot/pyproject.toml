@@ -1,0 +1,25 @@
+[project]
+name = "servercore-discord-bot"
+version = "0.1.0"
+description = "Discord commands for ServerCore Minecraft statistics and server status"
+requires-python = ">=3.12"
+dependencies = [
+  "discord.py>=2.5,<3.0",
+  "httpx>=0.28,<1.0"
+]
+
+[project.optional-dependencies]
+test = [
+  "pytest>=8.4,<9.0"
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
