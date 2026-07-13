@@ -57,6 +57,13 @@ def create_app(network_store: NetworkStore | None = None) -> FastAPI:
             raise HTTPException(status_code=400, detail="Path and payload player IDs must match")
         return active_store.upsert_player(payload)
 
+    @application.get("/players/by-name/{username}", response_model=PlayerRecord)
+    def get_player_by_username(username: str) -> PlayerRecord:
+        player = active_store.get_player_by_username(username)
+        if player is None:
+            raise HTTPException(status_code=404, detail="Player not found")
+        return player
+
     @application.get("/players/{player_id}", response_model=PlayerRecord)
     def get_player(player_id: UUID) -> PlayerRecord:
         player = active_store.get_player(player_id)
