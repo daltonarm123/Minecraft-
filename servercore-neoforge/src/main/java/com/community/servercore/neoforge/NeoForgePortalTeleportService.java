@@ -5,8 +5,8 @@ import com.community.servercore.portal.PortalDestination;
 import com.community.servercore.service.PortalTeleportService;
 import com.community.servercore.service.TeleportResult;
 import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -42,7 +42,7 @@ final class NeoForgePortalTeleportService implements PortalTeleportService {
         }
 
         try {
-            ResourceLocation dimensionId = parseDimension(destination.target());
+            Identifier dimensionId = parseDimension(destination.target());
             ResourceKey<Level> dimensionKey = ResourceKey.create(Registries.DIMENSION, dimensionId);
             ServerLevel destinationLevel = server.getLevel(dimensionKey);
             if (destinationLevel == null) {
@@ -61,9 +61,9 @@ final class NeoForgePortalTeleportService implements PortalTeleportService {
         }
     }
 
-    private static ResourceLocation parseDimension(String target) {
+    private static Identifier parseDimension(String target) {
         return target.contains(":")
-                ? ResourceLocation.parse(target)
-                : ResourceLocation.withDefaultNamespace(target);
+                ? Identifier.parse(target)
+                : Identifier.withDefaultNamespace(target);
     }
 }
