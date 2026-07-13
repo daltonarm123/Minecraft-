@@ -24,12 +24,12 @@ final class ServerCoreCommands {
         Objects.requireNonNull(runtimeSupplier, "runtimeSupplier");
 
         event.getDispatcher().register(Commands.literal("servercore")
-                .requires(source -> source.hasPermission(2))
+                .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
                 .then(Commands.literal("status")
                         .executes(context -> status(context.getSource(), runtimeSupplier))));
 
         LiteralArgumentBuilder<CommandSourceStack> portal = Commands.literal("portal");
-        portal.requires(source -> source.hasPermission(2));
+        portal.requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS));
 
         portal.then(namedPlayerCommand("begin", runtimeSupplier,
                 (runtime, actor, name) -> runtime.portalCommands().begin(actor, name)));
