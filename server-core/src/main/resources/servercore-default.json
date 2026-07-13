@@ -1,0 +1,12 @@
+{
+  "debugMode": false,
+  "portalCheckIntervalTicks": 5,
+  "portalFile": "portals.json",
+  "createBackups": true,
+  "maximumPortals": 100,
+  "allowOverlappingPortals": false,
+  "defaultCooldownSeconds": 3,
+  "logPortalUsage": true,
+  "apiBaseUrl": "",
+  "apiTimeoutSeconds": 10
+}
