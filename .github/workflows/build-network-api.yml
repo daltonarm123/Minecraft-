@@ -22,13 +22,28 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-          cache: pip
 
-      - name: Install dependencies
-        run: pip install -e '.[test]'
+      - name: Install and test
+        shell: bash
+        run: |
+          set +e
+          python --version > test.log 2>&1
+          pip install -e '.[test]' >> test.log 2>&1
+          install_exit=$?
+          if [ "$install_exit" -eq 0 ]; then
+            python -m compileall -q app tests >> test.log 2>&1
+            pytest -q >> test.log 2>&1
+            test_exit=$?
+          else
+            test_exit=$install_exit
+          fi
+          cat test.log
+          exit "$test_exit"
 
-      - name: Compile Python sources
-        run: python -m compileall -q app tests
-
-      - name: Run API tests
-        run: pytest -q
+      - name: Upload diagnostic log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: network-api-diagnostics
+          path: network-api/test.log
+          if-no-files-found: warn
