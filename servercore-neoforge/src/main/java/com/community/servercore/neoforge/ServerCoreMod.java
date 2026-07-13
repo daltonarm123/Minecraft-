@@ -67,7 +67,7 @@ public final class ServerCoreMod {
 
         PortalUseResult result = current.portals().tryUse(
                 player.getUUID(),
-                player.level().dimension().location().toString(),
+                player.level().dimension().identifier().toString(),
                 player.getX(),
                 player.getY(),
                 player.getZ());
