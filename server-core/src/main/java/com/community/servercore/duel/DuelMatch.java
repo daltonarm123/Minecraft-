@@ -58,8 +58,18 @@ public record DuelMatch(
             DuelMode mode,
             String arenaId,
             Instant now) {
+        return created(UUID.randomUUID(), firstPlayerId, secondPlayerId, mode, arenaId, now);
+    }
+
+    public static DuelMatch created(
+            UUID matchId,
+            UUID firstPlayerId,
+            UUID secondPlayerId,
+            DuelMode mode,
+            String arenaId,
+            Instant now) {
         return new DuelMatch(
-                UUID.randomUUID(),
+                matchId,
                 firstPlayerId,
                 secondPlayerId,
                 mode,
