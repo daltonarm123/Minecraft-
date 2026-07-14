@@ -21,6 +21,46 @@ public final class DefaultCosmeticCatalog {
 
     public static List<CosmeticDefinition> definitions() {
         return List.of(
+            definition(
+                "nomad-outfit",
+                "Nomad Outfit",
+                CosmeticCategory.OUTFIT,
+                CosmeticRarity.UNCOMMON,
+                CosmeticUnlockSource.SUPPORTER,
+                "servercore:cosmetics/outfits/nomad",
+                "Starter outfit tuned for launch progression and market circulation."),
+            definition(
+                "crimson-warden-outfit",
+                "Crimson Warden Outfit",
+                CosmeticCategory.OUTFIT,
+                CosmeticRarity.EPIC,
+                CosmeticUnlockSource.SUPPORTER,
+                "servercore:cosmetics/outfits/crimson_warden",
+                "High-tier outfit designed for endgame style without stat bonuses."),
+            definition(
+                "starlight-robe-outfit",
+                "Starlight Robe",
+                CosmeticCategory.OUTFIT,
+                CosmeticRarity.RARE,
+                CosmeticUnlockSource.QUEST,
+                "servercore:cosmetics/outfits/starlight_robe",
+                "Ritual-style robe for players focusing on progression milestones."),
+            definition(
+                "merchant-cap",
+                "Merchant Cap",
+                CosmeticCategory.HEAD,
+                CosmeticRarity.UNCOMMON,
+                CosmeticUnlockSource.SUPPORTER,
+                "servercore:cosmetics/head/merchant_cap",
+                "Trading-themed head cosmetic for economy-focused players."),
+            definition(
+                "guild-banner-back",
+                "Guild Banner",
+                CosmeticCategory.BACK,
+                CosmeticRarity.RARE,
+                CosmeticUnlockSource.QUEST,
+                "servercore:cosmetics/back/guild_banner",
+                "Back accessory built for social identity and team events."),
                 definition(
                         "pioneer-title",
                         "Pioneer",

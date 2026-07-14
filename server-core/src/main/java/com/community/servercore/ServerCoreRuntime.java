@@ -5,7 +5,10 @@ import com.community.servercore.audit.AuditEventType;
 import com.community.servercore.audit.AuditSink;
 import com.community.servercore.audit.InMemoryAuditSink;
 import com.community.servercore.command.CosmeticCommandService;
+import com.community.servercore.command.EconomyCommandService;
 import com.community.servercore.command.PortalCommandService;
+import com.community.servercore.command.RoleCommandService;
+import com.community.servercore.command.StaffAreaCommandService;
 import com.community.servercore.config.JsonConfigLoader;
 import com.community.servercore.config.ServerCoreConfig;
 import com.community.servercore.cosmetic.CosmeticsService;
@@ -17,6 +20,8 @@ import com.community.servercore.duel.RatingService;
 import com.community.servercore.player.InMemoryPlayerProfileRepository;
 import com.community.servercore.player.PlayerStatsService;
 import com.community.servercore.selection.PortalSelectionService;
+import com.community.servercore.economy.PlayerMarketService;
+import com.community.servercore.economy.WalletService;
 import com.community.servercore.service.PortalAccessService;
 import com.community.servercore.service.PortalCooldownService;
 import com.community.servercore.service.PortalService;
@@ -40,6 +45,11 @@ public final class ServerCoreRuntime {
     private final MatchmakingService matchmakingService;
     private final CosmeticsService cosmeticsService;
     private final CosmeticCommandService cosmeticCommandService;
+    private final WalletService walletService;
+    private final PlayerMarketService marketService;
+    private final EconomyCommandService economyCommandService;
+    private final RoleCommandService roleCommandService;
+    private final StaffAreaCommandService staffAreaCommandService;
     private final AuditSink auditSink;
 
     private ServerCoreRuntime(
@@ -52,6 +62,11 @@ public final class ServerCoreRuntime {
             MatchmakingService matchmakingService,
             CosmeticsService cosmeticsService,
             CosmeticCommandService cosmeticCommandService,
+            WalletService walletService,
+            PlayerMarketService marketService,
+            EconomyCommandService economyCommandService,
+            RoleCommandService roleCommandService,
+            StaffAreaCommandService staffAreaCommandService,
             AuditSink auditSink) {
         this.config = Objects.requireNonNull(config, "config");
         this.portalService = Objects.requireNonNull(portalService, "portalService");
@@ -62,6 +77,11 @@ public final class ServerCoreRuntime {
         this.matchmakingService = Objects.requireNonNull(matchmakingService, "matchmakingService");
         this.cosmeticsService = Objects.requireNonNull(cosmeticsService, "cosmeticsService");
         this.cosmeticCommandService = Objects.requireNonNull(cosmeticCommandService, "cosmeticCommandService");
+        this.walletService = Objects.requireNonNull(walletService, "walletService");
+        this.marketService = Objects.requireNonNull(marketService, "marketService");
+        this.economyCommandService = Objects.requireNonNull(economyCommandService, "economyCommandService");
+        this.roleCommandService = Objects.requireNonNull(roleCommandService, "roleCommandService");
+        this.staffAreaCommandService = Objects.requireNonNull(staffAreaCommandService, "staffAreaCommandService");
         this.auditSink = Objects.requireNonNull(auditSink, "auditSink");
     }
 
@@ -119,6 +139,18 @@ public final class ServerCoreRuntime {
         CosmeticCommandService cosmeticCommandService = new CosmeticCommandService(
                 cosmeticsService,
                 auditSink);
+        WalletService walletService = new WalletService(clock);
+        PlayerMarketService marketService = new PlayerMarketService(
+            walletService,
+            25,
+            500,
+            clock);
+        EconomyCommandService economyCommandService = new EconomyCommandService(
+            walletService,
+            marketService,
+            cosmeticsService);
+        RoleCommandService roleCommandService = new RoleCommandService();
+        StaffAreaCommandService staffAreaCommandService = new StaffAreaCommandService(portalCommandService);
 
         auditSink.publish(AuditEvent.system(
                 AuditEventType.CONFIG_LOADED,
@@ -130,6 +162,10 @@ public final class ServerCoreRuntime {
                     clock.instant(),
                     "Seeded " + seededCosmetics + " default cosmetic definitions"));
         }
+        auditSink.publish(AuditEvent.system(
+            AuditEventType.ADMIN_COMMAND,
+            clock.instant(),
+            "Initialized launch economy defaults (listingFee=25 SC, tax=5%)"));
 
         return new ServerCoreRuntime(
                 config,
@@ -141,6 +177,11 @@ public final class ServerCoreRuntime {
                 matchmakingService,
                 cosmeticsService,
                 cosmeticCommandService,
+            walletService,
+            marketService,
+            economyCommandService,
+            roleCommandService,
+            staffAreaCommandService,
                 auditSink);
     }
 
@@ -178,6 +219,26 @@ public final class ServerCoreRuntime {
 
     public CosmeticCommandService cosmeticCommands() {
         return cosmeticCommandService;
+    }
+
+    public WalletService wallets() {
+        return walletService;
+    }
+
+    public PlayerMarketService market() {
+        return marketService;
+    }
+
+    public EconomyCommandService economyCommands() {
+        return economyCommandService;
+    }
+
+    public RoleCommandService roles() {
+        return roleCommandService;
+    }
+
+    public StaffAreaCommandService staffAreas() {
+        return staffAreaCommandService;
     }
 
     public AuditSink audit() {

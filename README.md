@@ -68,6 +68,8 @@ The platform is preparing for mixed Java PC and console players through a staged
 Initial launch gameplay is focused on Survival and 1v1 portal routing from spawn, plus a controlled in-game currency and player market model.
 
 - Execution plan: `docs/LAUNCH_PORTALS_AND_ECONOMY_PLAN.md`
+- Shop pricing catalog: `docs/SHOP_CATALOG.md`
+- Staff roles and command map: `docs/STAFF_ROLES_AND_COMMANDS.md`
 
 ## Repository structure
 

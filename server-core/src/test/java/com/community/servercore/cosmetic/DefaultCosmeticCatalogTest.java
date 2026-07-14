@@ -9,14 +9,19 @@ class DefaultCosmeticCatalogTest {
     void seedsOriginalCatalogIdempotently() {
         CosmeticsService service = new CosmeticsService(new InMemoryCosmeticRepository());
 
-        assertThat(DefaultCosmeticCatalog.seed(service)).isEqualTo(4);
+        assertThat(DefaultCosmeticCatalog.seed(service)).isEqualTo(9);
         assertThat(DefaultCosmeticCatalog.seed(service)).isZero();
         assertThat(service.listDefinitions(false))
                 .extracting(CosmeticDefinition::id)
-                .containsExactly(
+            .containsExactlyInAnyOrder(
+                "crimson-warden-outfit",
                         "ember-trail",
                         "founder-crown",
+                "guild-banner-back",
+                "merchant-cap",
+                "nomad-outfit",
                         "pioneer-title",
+                "starlight-robe-outfit",
                         "void-nameplate");
     }
 }
