@@ -1,0 +1,13 @@
+.verify/
+**/__pycache__/
+**/*.py[cod]
+**/*.egg-info/
+
+# Gradle and Java build artifacts
+**/.gradle/
+**/build/
+
+# IDE files
+.vscode/
+.idea/
+*.iml
