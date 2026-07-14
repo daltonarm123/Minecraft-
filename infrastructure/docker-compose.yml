@@ -4,7 +4,7 @@ services:
       context: ../network-api
     environment:
       SERVERCORE_API_KEY: ${SERVERCORE_API_KEY:-development-key}
-      SERVERCORE_ALLOWED_ORIGINS: ${SERVERCORE_ALLOWED_ORIGINS:-http://localhost:8080}
+      SERVERCORE_ALLOWED_ORIGINS: ${SERVERCORE_ALLOWED_ORIGINS:-http://localhost:8000}
     ports:
       - "8000:8000"
     restart: unless-stopped
@@ -14,27 +14,3 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
-
-  website:
-    build:
-      context: ../website
-    ports:
-      - "8080:80"
-    depends_on:
-      network-api:
-        condition: service_healthy
-    restart: unless-stopped
-
-  discord-bot:
-    profiles: ["bot"]
-    build:
-      context: ../discord-bot
-    environment:
-      DISCORD_TOKEN: ${DISCORD_TOKEN:?Set DISCORD_TOKEN before enabling the bot profile}
-      SERVERCORE_API_URL: http://network-api:8000
-      SERVERCORE_API_KEY: ${SERVERCORE_API_KEY:-development-key}
-      LOG_LEVEL: ${LOG_LEVEL:-INFO}
-    depends_on:
-      network-api:
-        condition: service_healthy
-    restart: unless-stopped

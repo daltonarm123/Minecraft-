@@ -13,11 +13,11 @@ The workflows are now consolidated into `.github/workflows/ci.yml` with:
 - explicit Gradle 9.1.0 setup
 - Java 21 for the platform-independent core
 - Java 25 for the ATM11 NeoForge adapter
-- separate jobs for the API, Discord bot, website, core, and adapter
+- separate jobs for the API, core, and adapter
 
 ## Current external blocker
 
-GitHub accepts the workflow and creates all five jobs, but each job fails before its first step. GitHub returns no step list and no downloadable job log. This means the runner is not starting; it is not a normal Java, Python, Node, Gradle, or test failure.
+GitHub accepts the workflow and creates all configured jobs, but each job fails before its first step. GitHub returns no step list and no downloadable job log. This means the runner is not starting; it is not a normal Java, Python, Gradle, or test failure.
 
 The repository cannot repair an account-level or GitHub-hosted runner restriction from source code.
 
@@ -31,7 +31,6 @@ The repository cannot repair an account-level or GitHub-hosted runner restrictio
    - `actions/checkout`
    - `actions/setup-java`
    - `actions/setup-python`
-   - `actions/setup-node`
    - `actions/upload-artifact`
    - `gradle/actions/setup-gradle`
 6. Open the account's **Settings → Billing and licensing** pages and check Actions usage, budgets, payment problems, and account restrictions.
@@ -46,7 +45,13 @@ Run:
 ./scripts/verify-local.sh
 ```
 
-This validates Python, JavaScript, and Java components on a development machine with the required tools. The NeoForge build additionally needs Java 25, Gradle 9.1+, dependency-download access, and enough memory.
+This validates Python and Java components on a development machine with the required tools. The NeoForge build additionally needs Java 25, Gradle 9.1+, dependency-download access, and enough memory.
+
+If needed, run subsets with environment flags:
+
+```bash
+VERIFY_API=1 VERIFY_CORE=0 VERIFY_NEOFORGE=0 ./scripts/verify-local.sh
+```
 
 ## Private-server verification
 

@@ -31,7 +31,7 @@ Cosmetic write operations are server-authoritative. Clients may read the public 
 
 ## Authentication
 
-Set `SERVERCORE_API_KEY` in production. Write endpoints then require the same value in the `X-ServerCore-Key` header. Read endpoints remain public for the website and Discord bot.
+Set `SERVERCORE_API_KEY` in production. Write endpoints then require the same value in the `X-ServerCore-Key` header. Read endpoints can remain public for approved server-side consumers.
 
 ## Current storage limitation
 

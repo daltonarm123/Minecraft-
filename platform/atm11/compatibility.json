@@ -4,10 +4,17 @@
   "minecraftVersion": "26.1.2",
   "neoForgeVersion": "26.1.2.76",
   "javaVersion": 25,
+  "consoleSupport": {
+    "status": "planned",
+    "strategy": "bedrock-bridge",
+    "publicReady": false,
+    "planDocument": "docs/CONSOLE_CONNECTIVITY_PLAN.md"
+  },
   "status": "provisional",
   "notes": [
     "Pinned to the NeoForge version listed in the current ATM11 mod list.",
     "Revalidate before every private-server update.",
-    "ServerCore remains platform-independent; the NeoForge adapter is version-specific."
+    "ServerCore remains platform-independent; the NeoForge adapter is version-specific.",
+    "Console support is tracked as a staged rollout and is not public-ready yet."
   ]
 }

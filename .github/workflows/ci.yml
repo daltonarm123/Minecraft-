@@ -75,57 +75,6 @@ jobs:
           python -m compileall -q app tests
           python -m pytest -q
 
-  discord-bot:
-    name: Discord Bot
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    defaults:
-      run:
-        working-directory: discord-bot
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Set up Python 3.12
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-          cache: pip
-          cache-dependency-path: discord-bot/pyproject.toml
-
-      - name: Install and test bot
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install -e '.[test]'
-          python -m compileall -q app tests
-          python -m pytest -q
-
-  website:
-    name: Website
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    defaults:
-      run:
-        working-directory: website
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Set up Node 22
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-
-      - name: Validate website
-        run: |
-          node --check config.js
-          node --check app.js
-          test -s index.html
-          test -s styles.css
-          test -s nginx.conf
-          grep -q 'id="leaderboard-body"' index.html
-          grep -q '/leaderboard' app.js
-
   neoforge:
     name: ATM11 NeoForge Adapter
     runs-on: ubuntu-latest

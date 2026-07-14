@@ -12,6 +12,12 @@ Use this plan only after the ServerCore NeoForge JAR builds successfully. Do not
 - A disposable world or a full world backup
 - Access to `logs/latest.log` and crash reports
 
+### Additional requirements for mixed PC and console testing
+
+- A staged Bedrock bridge setup in front of the Java server
+- A documented identity-link strategy for Bedrock and Java accounts
+- At least one Java PC tester and one console/Bedrock tester online at the same time
+
 ## Installation smoke test
 
 1. Back up the test server.
@@ -24,6 +30,17 @@ Use this plan only after the ServerCore NeoForge JAR builds successfully. Do not
 8. Confirm no credentials or personal information appear in the logs.
 
 A failure in this section blocks all other testing.
+
+## Mixed PC and console smoke test
+
+1. Start the Java server and bridge components in the documented order.
+2. Join with one Java client and one console/Bedrock client.
+3. Confirm both players can see each other and chat.
+4. Confirm both players can run basic non-operator movement and interaction flows in spawn.
+5. Confirm staff can target and moderate each player identity reliably.
+6. Confirm join/quit and moderation actions are written to logs with consistent identity metadata.
+
+A failure in this section blocks public console support claims.
 
 ## Create the first portal
 
@@ -61,6 +78,8 @@ Record pass/fail for every item.
 - Test while mounted, crouching, sprinting, and flying where the modpack permits it.
 - Confirm a failed teleport does not begin the cooldown.
 - Confirm a player cannot become trapped in an instant portal loop.
+- Confirm Java and Bedrock players can both trigger compatible portal flows.
+- Confirm mixed-protocol portal use does not duplicate player profile, match history, or audit identity.
 
 ## Performance test
 
@@ -69,6 +88,7 @@ Record pass/fail for every item.
 3. Watch server tick time, memory use, and log volume.
 4. Confirm portal checks do not flood `latest.log`.
 5. Repeat with the configured check interval changed from 5 ticks to 10 ticks.
+6. Repeat with mixed Java and Bedrock player movement through the same portal regions.
 
 ## Persistence and recovery test
 
@@ -126,5 +146,6 @@ Crash-report filename, if any:
 - `config/servercore/portals.json`
 - A short screen recording beginning before reproduction
 - The exact ATM11 server-pack and NeoForge versions
+- Bridge component versions and relevant bridge logs for mixed-protocol failures
 
 Remove tokens, passwords, IP allowlists, and unrelated personal information before sharing logs.

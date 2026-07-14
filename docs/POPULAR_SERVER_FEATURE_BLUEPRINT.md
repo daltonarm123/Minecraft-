@@ -110,7 +110,7 @@ These are social identity groups, not unrestricted griefing factions.
 - Guild halls in a later release
 - Player profiles
 - Inspectable achievements and cosmetics
-- Discord account linking
+- Account linking
 
 ## Economy and trading
 
@@ -211,8 +211,7 @@ These are social identity groups, not unrestricted griefing factions.
 - Daily and weekly quests
 - Achievements and badges
 - Casual and ranked 1v1
-- Discord stats
-- Website leaderboard
+- In-game stats and leaderboard visibility
 
 ### Post-launch expansion
 

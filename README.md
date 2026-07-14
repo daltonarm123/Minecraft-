@@ -1,6 +1,6 @@
-# ServerCore Community Minecraft Platform
+# ServerCore Minecraft Server Platform
 
-Custom development foundation for a community All The Mods 11 server with modded survival, configurable portals, ranked duels, a public leaderboard, and Discord integration.
+Custom development foundation for an All The Mods 11 server with modded survival, configurable portals, ranked duels, and server-side APIs.
 
 ## Compatibility target
 
@@ -47,15 +47,21 @@ Revalidate these values before updating the ATM11 server pack. See `platform/atm
   - `/portal enable <name>`
   - `/portal disable <name>`
 
-### Network and community services
+### Network services
 
 - FastAPI player, leaderboard, match, event, and health endpoints
 - Optional API-key protection for write operations
-- CORS configuration for the community website
-- Discord bot commands for stats, leaderboard, and API health
-- Static responsive community website
+- CORS configuration for approved origins
 - Dockerfiles and a local Docker Compose stack
-- GitHub Actions workflows for core, NeoForge, API, bot, and website validation
+- GitHub Actions workflows for core, NeoForge, and API validation
+
+## Console readiness
+
+The platform is preparing for mixed Java PC and console players through a staged Bedrock bridge approach.
+
+- Planning doc: `docs/CONSOLE_CONNECTIVITY_PLAN.md`
+- Current state: not yet enabled for public players
+- Release rule: ship only after mixed-protocol private tests pass
 
 ## Repository structure
 
@@ -63,8 +69,6 @@ Revalidate these values before updating the ATM11 server pack. See `platform/atm
 server-core/          Platform-independent Java domain and services
 servercore-neoforge/  ATM11/NeoForge Minecraft adapter and mod build
 network-api/          FastAPI service
-discord-bot/          Discord community bot
-website/              Public status and leaderboard site
 infrastructure/       Docker Compose and deployment notes
 platform/atm11/       Version compatibility target
 ```
@@ -89,7 +93,7 @@ gradle clean build
 
 Output: `servercore-neoforge/build/libs/servercore-0.1.0.jar`
 
-## Run API and website locally
+## Run API locally
 
 ```bash
 cd infrastructure
@@ -97,7 +101,6 @@ cp .env.example .env
 docker compose up --build
 ```
 
-Website: `http://localhost:8080`  
 API: `http://localhost:8000`  
 API docs: `http://localhost:8000/docs`
 
@@ -107,6 +110,7 @@ API docs: `http://localhost:8000/docs`
 - Only local `LOCATION` portal destinations are connected to Minecraft. Cross-server `SERVER`, `ARENA`, and `EVENT` routing still needs a proxy or dedicated resolver.
 - Ranked duel domain logic exists, but Minecraft combat lifecycle, inventory kits, arena boundaries, death handling, and spectator behavior still need NeoForge event wiring.
 - The ATM11 mod JAR must pass CI and then be tested inside a real private ATM11 server.
+- Console access support is planned but not yet operational; Bedrock bridge setup, identity-link policy, and mixed-protocol validation are still required.
 - No payments, paid entry, shop, or supporter entitlements are implemented.
 - Hosting, backups, monitoring, moderation policy, and production secrets are not configured.
 

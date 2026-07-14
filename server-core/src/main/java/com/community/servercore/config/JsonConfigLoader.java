@@ -2,7 +2,6 @@ package com.community.servercore.config;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import com.google.gson.JsonParseException;
 
 import java.io.IOException;
 import java.io.Reader;
@@ -35,8 +34,18 @@ public final class JsonConfigLoader {
             if (config == null) {
                 throw new IOException("Configuration file is empty: " + file);
             }
-            return config;
-        } catch (JsonParseException | IllegalArgumentException exception) {
+            return new ServerCoreConfig(
+                    config.debugMode(),
+                    config.portalCheckIntervalTicks(),
+                    config.portalFile(),
+                    config.createBackups(),
+                    config.maximumPortals(),
+                    config.allowOverlappingPortals(),
+                    config.defaultCooldownSeconds(),
+                    config.logPortalUsage(),
+                    config.apiBaseUrl(),
+                    config.apiTimeoutSeconds());
+        } catch (RuntimeException exception) {
             throw new IOException("Invalid ServerCore configuration: " + file, exception);
         }
     }
