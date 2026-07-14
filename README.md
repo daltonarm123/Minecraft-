@@ -63,6 +63,12 @@ The platform is preparing for mixed Java PC and console players through a staged
 - Current state: not yet enabled for public players
 - Release rule: ship only after mixed-protocol private tests pass
 
+## Launch portals and economy
+
+Initial launch gameplay is focused on Survival and 1v1 portal routing from spawn, plus a controlled in-game currency and player market model.
+
+- Execution plan: `docs/LAUNCH_PORTALS_AND_ECONOMY_PLAN.md`
+
 ## Repository structure
 
 ```text
@@ -111,6 +117,7 @@ API docs: `http://localhost:8000/docs`
 - Ranked duel domain logic exists, but Minecraft combat lifecycle, inventory kits, arena boundaries, death handling, and spectator behavior still need NeoForge event wiring.
 - The ATM11 mod JAR must pass CI and then be tested inside a real private ATM11 server.
 - Console access support is planned but not yet operational; Bedrock bridge setup, identity-link policy, and mixed-protocol validation are still required.
+- Player market and currency systems are planned for launch but are not implemented in the current server code yet.
 - No payments, paid entry, shop, or supporter entitlements are implemented.
 - Hosting, backups, monitoring, moderation policy, and production secrets are not configured.
 

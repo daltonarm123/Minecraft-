@@ -42,6 +42,16 @@ A failure in this section blocks all other testing.
 
 A failure in this section blocks public console support claims.
 
+## Launch portal layout validation (Survival + 1v1)
+
+1. In spawn, confirm exactly two player-facing launch portals are enabled: `survival` and `duel1v1`.
+2. Confirm both destinations are reachable and return paths are intentional.
+3. Confirm there are no accidental overlaps between the two portal trigger regions.
+4. Confirm disabled non-launch portals cannot be triggered.
+5. Confirm both portals still work after restart.
+
+Use `docs/LAUNCH_PORTALS_AND_ECONOMY_PLAN.md` as the source runbook for setup and naming.
+
 ## Create the first portal
 
 The portal region is selected where players will enter. The destination is the location where the administrator stands when the portal is created.
@@ -114,6 +124,16 @@ The Java duel and rating logic exists, but actual Minecraft combat wiring is not
 - Winner recording and Elo changes
 - Arena cleanup and reuse
 - Restart recovery during an active match
+
+## Economy launch readiness tests
+
+The launch economy design is documented, but the implementation does not exist yet. Before enabling market trading or paid top-ups, verify:
+
+- Wallet ledger integrity under concurrent transactions
+- Listing fee and tax application accuracy
+- Market purchase settlement correctness (buyer debit, seller credit, fee/tax sinks)
+- Staff wallet freeze and reversal workflow
+- Audit-log completeness for disputes and fraud review
 
 ## Tester bug report template
 
