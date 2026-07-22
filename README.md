@@ -1,6 +1,6 @@
 # ServerCore Minecraft Server Platform
 
-Custom development foundation for an All The Mods 11 server with modded survival, configurable portals, ranked duels, and server-side APIs.
+Custom development foundation for an All The Mods 11 server with modded survival, configurable portals, ranked duels, a player economy, and server-side APIs.
 
 ## Compatibility target
 
@@ -26,6 +26,7 @@ Revalidate these values before updating the ATM11 server pack. See `platform/atm
 - Arena reservation and release
 - Elo rating updates
 - Structured audit events
+- Server-authoritative cosmetics, wallets, shop catalog, and player market services
 - Automated unit tests that do not require Minecraft
 
 ### ATM11 NeoForge adapter
@@ -35,25 +36,35 @@ Revalidate these values before updating the ATM11 server pack. See `platform/atm
 - Player portal-region detection
 - Local world/dimension location teleports
 - Operator-backed administration permissions
-- In-game portal commands:
-  - `/servercore status`
-  - `/portal begin <name>`
-  - `/portal pos1 <name>`
-  - `/portal pos2 <name>`
-  - `/portal create <name>` — run while standing at the destination where players should arrive
-  - `/portal list`
-  - `/portal info <name>`
-  - `/portal delete <name>`
-  - `/portal enable <name>`
-  - `/portal disable <name>`
+- Discord-to-Minecraft account linking with `/link <code>`
+- In-game portal, role, economy, shop, and market commands
 
 ### Network services
 
-- FastAPI player, leaderboard, match, event, and health endpoints
+- FastAPI player, leaderboard, match, event, cosmetic, and health endpoints
+- Discord OAuth player login
+- Web player portal at `/portal`
+- Linked Minecraft profile, stats, achievements, and leaderboard views
+- Hosted membership checkout handoff and server-authoritative membership status
+- Support tickets and community feature voting
 - Optional API-key protection for write operations
 - CORS configuration for approved origins
 - Dockerfiles and a local Docker Compose stack
 - GitHub Actions workflows for core, NeoForge, and API validation
+
+## Player portal MVP
+
+The portal gives members one place to:
+
+- Log in with Discord
+- Link their Minecraft account
+- View synchronized stats and achievements
+- Check leaderboards
+- Open the configured $5 membership checkout
+- Submit support tickets
+- Vote on proposed features
+
+Deployment and security notes: `docs/PLAYER_PORTAL.md`
 
 ## Console readiness
 
@@ -76,7 +87,7 @@ Initial launch gameplay is focused on Survival and 1v1 portal routing from spawn
 ```text
 server-core/          Platform-independent Java domain and services
 servercore-neoforge/  ATM11/NeoForge Minecraft adapter and mod build
-network-api/          FastAPI service
+network-api/          FastAPI service and player portal
 infrastructure/       Docker Compose and deployment notes
 platform/atm11/       Version compatibility target
 ```
@@ -110,17 +121,17 @@ docker compose up --build
 ```
 
 API: `http://localhost:8000`  
-API docs: `http://localhost:8000/docs`
+API docs: `http://localhost:8000/docs`  
+Player portal: `http://localhost:8000/portal`
 
 ## Current limitations
 
-- The API currently uses in-memory storage; PostgreSQL is required before public launch.
+- The API and player portal currently use in-memory storage; PostgreSQL is required before public launch.
+- Payment checkout can be configured, but verified payment-provider webhooks and automatic join enforcement are not implemented yet.
 - Only local `LOCATION` portal destinations are connected to Minecraft. Cross-server `SERVER`, `ARENA`, and `EVENT` routing still needs a proxy or dedicated resolver.
 - Ranked duel domain logic exists, but Minecraft combat lifecycle, inventory kits, arena boundaries, death handling, and spectator behavior still need NeoForge event wiring.
 - The ATM11 mod JAR must pass CI and then be tested inside a real private ATM11 server.
 - Console access support is planned but not yet operational; Bedrock bridge setup, identity-link policy, and mixed-protocol validation are still required.
-- Player market and currency systems are planned for launch but are not implemented in the current server code yet.
-- No payments, paid entry, shop, or supporter entitlements are implemented.
 - Hosting, backups, monitoring, moderation policy, and production secrets are not configured.
 
 ## Development rule
