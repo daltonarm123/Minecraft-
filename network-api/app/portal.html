@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>ServerCore Player Portal</title>
+  <style>
+    :root{color-scheme:dark;--bg:#090d16;--panel:#121827;--line:#26314a;--text:#eef3ff;--muted:#9ca8c2;--accent:#6d8cff;--good:#55d68b;--warn:#ffc766}
+    *{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at top,#17223d 0,#090d16 42%);color:var(--text);font:15px/1.5 Inter,system-ui,sans-serif;min-height:100vh}
+    header{max-width:1180px;margin:auto;padding:34px 22px 18px;display:flex;gap:18px;align-items:center;justify-content:space-between}h1,h2,h3,p{margin-top:0}h1{font-size:clamp(28px,4vw,48px);margin-bottom:6px}.sub{color:var(--muted)}
+    main{max-width:1180px;margin:auto;padding:0 22px 60px}.grid{display:grid;grid-template-columns:repeat(12,1fr);gap:16px}.card{grid-column:span 6;background:rgba(18,24,39,.94);border:1px solid var(--line);border-radius:18px;padding:20px;box-shadow:0 16px 50px rgba(0,0,0,.25)}.wide{grid-column:1/-1}.third{grid-column:span 4}
+    button,a.button{border:0;border-radius:11px;padding:10px 14px;background:var(--accent);color:white;font-weight:750;cursor:pointer;text-decoration:none;display:inline-block}button.secondary{background:#232d44}button:disabled{opacity:.55;cursor:not-allowed}
+    input,textarea{width:100%;border:1px solid var(--line);border-radius:10px;background:#0b1020;color:var(--text);padding:11px;margin:5px 0 12px}textarea{min-height:110px;resize:vertical}
+    .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.hidden{display:none!important}.pill{display:inline-flex;padding:5px 9px;border-radius:999px;background:#222c44;color:#cbd5f4;font-size:12px}.good{color:var(--good)}.warn{color:var(--warn)}
+    .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.stat{background:#0b1020;border:1px solid var(--line);padding:13px;border-radius:12px}.stat b{display:block;font-size:24px}.muted{color:var(--muted)}
+    table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:10px;border-bottom:1px solid var(--line)}th{color:var(--muted);font-size:12px;text-transform:uppercase}.feature,.ticket,.achievement{border:1px solid var(--line);border-radius:12px;padding:13px;margin-top:10px;background:#0d1322}.feature{display:flex;justify-content:space-between;gap:14px}.feature button{white-space:nowrap}.achievement.locked{opacity:.55}.code{font:700 28px ui-monospace,monospace;letter-spacing:4px;color:var(--warn)}#notice{margin:0 0 16px;padding:12px 14px;border-radius:12px;background:#222c44;display:none}
+    @media(max-width:850px){.card,.third{grid-column:1/-1}.stats{grid-template-columns:repeat(2,1fr)}header{align-items:flex-start;flex-direction:column}}
+  </style>
+</head>
+<body>
+<header>
+  <div><h1>ServerCore Portal</h1><p class="sub">Your Minecraft profile, membership, support, and community roadmap.</p></div>
+  <div class="row"><span id="identity" class="muted">Not signed in</span><a id="login" class="button" href="/auth/discord/login">Log in with Discord</a><button id="logout" class="secondary hidden">Log out</button></div>
+</header>
+<main>
+  <div id="notice"></div>
+  <section class="grid">
+    <article class="card">
+      <h2>Player profile</h2>
+      <div id="signedOut"><p class="muted">Log in with Discord to link your Minecraft account and view your private profile.</p></div>
+      <div id="profile" class="hidden">
+        <p id="linkState" class="muted"></p>
+        <div id="stats" class="stats"></div>
+        <div class="row" style="margin-top:14px"><button id="linkButton" class="secondary">Link Minecraft account</button><span id="linkCode"></span></div>
+      </div>
+    </article>
+
+    <article class="card">
+      <h2>Membership</h2>
+      <p>Founder access is <strong>$5 per month</strong> once checkout is connected.</p>
+      <p>Status: <span id="membership" class="pill">Sign in required</span></p>
+      <button id="checkout" disabled>Purchase membership</button>
+    </article>
+
+    <article class="card">
+      <h2>Achievements</h2>
+      <div id="achievements" class="muted">Link an account to load achievements.</div>
+    </article>
+
+    <article class="card">
+      <h2>Support tickets</h2>
+      <form id="ticketForm">
+        <input id="ticketSubject" maxlength="120" placeholder="Subject" required />
+        <textarea id="ticketMessage" maxlength="4000" placeholder="Tell us what happened" required></textarea>
+        <button type="submit" disabled>Submit ticket</button>
+      </form>
+      <div id="tickets"></div>
+    </article>
+
+    <article class="card wide">
+      <h2>Feature voting</h2>
+      <p class="muted">Vote on what the server team should build next.</p>
+      <div id="features"></div>
+    </article>
+
+    <article class="card wide">
+      <h2>Leaderboard</h2>
+      <div style="overflow:auto"><table><thead><tr><th>Rank</th><th>Player</th><th>Rating</th><th>Wins</th><th>Losses</th><th>Win rate</th></tr></thead><tbody id="leaderboard"></tbody></table></div>
+    </article>
+  </section>
+</main>
+<script>
+  const state={me:null};
+  const $=id=>document.getElementById(id);
+  function notice(message,error=false){const n=$('notice');n.textContent=message;n.style.display='block';n.style.background=error?'#4a2028':'#222c44';setTimeout(()=>n.style.display='none',5000)}
+  async function api(url,options={}){const response=await fetch(url,{...options,headers:{'Content-Type':'application/json',...(options.headers||{})}});if(!response.ok){let detail=`HTTP ${response.status}`;try{detail=(await response.json()).detail||detail}catch{}throw new Error(detail)}return response.status===204?null:response.json()}
+  function renderMe(me){state.me=me;$('identity').textContent=me.discord.global_name||me.discord.username;$('login').classList.add('hidden');$('logout').classList.remove('hidden');$('signedOut').classList.add('hidden');$('profile').classList.remove('hidden');$('checkout').disabled=false;$('ticketForm').querySelector('button').disabled=false;
+    $('membership').textContent=me.membership.status;$('membership').className='pill '+(me.membership.status==='ACTIVE'?'good':'');
+    if(me.minecraft_link){$('linkState').innerHTML=`Linked to <strong>${me.minecraft_link.username}</strong>`;$('linkButton').textContent='Create a new link code'}else{$('linkState').textContent='No Minecraft account linked yet.'}
+    const p=me.player;$('stats').innerHTML=p?[['Rating',p.rating],['Wins',p.wins],['Losses',p.losses],['Kills',p.kills],['Deaths',p.deaths],['Last seen',new Date(p.last_seen).toLocaleDateString()]].map(([k,v])=>`<div class="stat"><span class="muted">${k}</span><b>${v}</b></div>`).join(''):'<p class="muted">Link your account, then play once so the server can sync your stats.</p>';
+    $('achievements').innerHTML=me.achievements.length?me.achievements.map(a=>`<div class="achievement ${a.state==='LOCKED'?'locked':''}"><strong>${a.title}</strong> <span class="pill">${a.state}</span><div class="muted">${a.description} ${a.progress}/${a.target}</div></div>`).join(''):'Link your account to load achievements.';
+  }
+  async function loadMe(){try{const me=await api('/api/portal/me');renderMe(me);const tickets=await api('/api/portal/tickets');renderTickets(tickets)}catch(error){if(!String(error.message).includes('Discord login required'))notice(error.message,true)}}
+  async function loadLeaderboard(){try{const rows=await api('/api/portal/leaderboard?limit=25');$('leaderboard').innerHTML=rows.map(r=>`<tr><td>${r.rank}</td><td>${r.username}</td><td>${r.rating}</td><td>${r.wins}</td><td>${r.losses}</td><td>${Math.round(r.win_rate*100)}%</td></tr>`).join('')||'<tr><td colspan="6" class="muted">No synced players yet.</td></tr>'}catch(e){notice(e.message,true)}}
+  async function loadFeatures(){try{const items=await api('/api/portal/features');$('features').innerHTML=items.map(f=>`<div class="feature"><div><strong>${f.title}</strong> <span class="pill">${f.status}</span><div class="muted">${f.description}</div></div><button onclick="vote('${f.proposal_id}')" ${state.me?'':'disabled'}>${f.vote_count} votes</button></div>`).join('')}catch(e){notice(e.message,true)}}
+  function renderTickets(items){$('tickets').innerHTML=items.map(t=>`<div class="ticket"><strong>${t.subject}</strong> <span class="pill">${t.status}</span><div class="muted">${t.message}</div></div>`).join('')}
+  async function vote(id){try{await api(`/api/portal/features/${id}/vote`,{method:'POST'});await loadFeatures()}catch(e){notice(e.message,true)}}window.vote=vote;
+  $('linkButton').onclick=async()=>{try{const challenge=await api('/api/portal/link-challenges',{method:'POST'});$('linkCode').innerHTML=`Run <span class="code">/link ${challenge.code}</span> in Minecraft`;notice('Link code created. It expires in 10 minutes.')}catch(e){notice(e.message,true)}};
+  $('checkout').onclick=async()=>{try{const result=await api('/api/portal/membership/checkout',{method:'POST'});location.href=result.checkout_url}catch(e){notice(e.message,true)}};
+  $('ticketForm').onsubmit=async event=>{event.preventDefault();try{await api('/api/portal/tickets',{method:'POST',body:JSON.stringify({subject:$('ticketSubject').value,message:$('ticketMessage').value})});event.target.reset();renderTickets(await api('/api/portal/tickets'));notice('Support ticket submitted.')}catch(e){notice(e.message,true)}};
+  $('logout').onclick=async()=>{await api('/auth/logout',{method:'POST'});location.reload()};
+  Promise.all([loadMe(),loadLeaderboard()]).then(loadFeatures);
+</script>
+</body>
+</html>
