@@ -3,7 +3,6 @@ from __future__ import annotations
 import os
 from collections.abc import Callable
 from pathlib import Path
-from typing import Annotated
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 from uuid import UUID
 
@@ -11,7 +10,7 @@ import httpx
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Query, Response, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from .models import PlayerRecord
+from .models import LeaderboardEntry, PlayerRecord
 from .portal_models import (
     AchievementState,
     CheckoutResponse,
@@ -86,7 +85,7 @@ def create_portal_router(
     router = APIRouter()
 
     def require_user(
-        session_token: Annotated[str | None, Cookie(alias=SESSION_COOKIE)] = None,
+        session_token: str | None = Cookie(default=None, alias=SESSION_COOKIE),
     ) -> DiscordIdentity:
         identity = portal_store.get_session(session_token)
         if identity is None:
@@ -117,7 +116,10 @@ def create_portal_router(
         return RedirectResponse(f"{DISCORD_AUTHORIZE_URL}?{query}")
 
     @router.get("/auth/discord/callback", include_in_schema=False)
-    def discord_callback(code: str, state_value: Annotated[str, Query(alias="state")]) -> RedirectResponse:
+    def discord_callback(
+        code: str,
+        state_value: str = Query(alias="state"),
+    ) -> RedirectResponse:
         if not portal_store.consume_oauth_state(state_value):
             raise HTTPException(status_code=400, detail="Discord OAuth state is invalid or expired")
 
@@ -178,15 +180,15 @@ def create_portal_router(
 
     @router.post("/auth/logout", status_code=status.HTTP_204_NO_CONTENT)
     def logout(
-        response: Response,
-        session_token: Annotated[str | None, Cookie(alias=SESSION_COOKIE)] = None,
+        session_token: str | None = Cookie(default=None, alias=SESSION_COOKIE),
     ) -> Response:
         portal_store.delete_session(session_token)
+        response = Response(status_code=status.HTTP_204_NO_CONTENT)
         response.delete_cookie(SESSION_COOKIE, path="/")
         return response
 
     @router.get("/api/portal/me", response_model=PortalMe)
-    def portal_me(identity: Annotated[DiscordIdentity, Depends(require_user)]) -> PortalMe:
+    def portal_me(identity: DiscordIdentity = Depends(require_user)) -> PortalMe:
         link = portal_store.get_link(identity.discord_user_id)
         player = network_store.get_player(link.player_id) if link else None
         return PortalMe(
@@ -197,8 +199,8 @@ def create_portal_router(
             membership=portal_store.get_membership(identity.discord_user_id),
         )
 
-    @router.get("/api/portal/leaderboard")
-    def portal_leaderboard(limit: Annotated[int, Query(ge=1, le=100)] = 25):
+    @router.get("/api/portal/leaderboard", response_model=list[LeaderboardEntry])
+    def portal_leaderboard(limit: int = Query(default=25, ge=1, le=100)) -> list[LeaderboardEntry]:
         return network_store.leaderboard(limit)
 
     @router.get(
@@ -213,7 +215,7 @@ def create_portal_router(
 
     @router.post("/api/portal/link-challenges", response_model=LinkChallenge)
     def create_link_challenge(
-        identity: Annotated[DiscordIdentity, Depends(require_user)],
+        identity: DiscordIdentity = Depends(require_user),
     ) -> LinkChallenge:
         return portal_store.create_link_challenge(identity.discord_user_id)
 
@@ -229,12 +231,14 @@ def create_portal_router(
             raise HTTPException(status_code=400, detail=str(exception)) from exception
 
     @router.get("/api/portal/membership", response_model=MembershipRecord)
-    def membership(identity: Annotated[DiscordIdentity, Depends(require_user)]) -> MembershipRecord:
+    def membership(
+        identity: DiscordIdentity = Depends(require_user),
+    ) -> MembershipRecord:
         return portal_store.get_membership(identity.discord_user_id)
 
     @router.post("/api/portal/membership/checkout", response_model=CheckoutResponse)
     def membership_checkout(
-        identity: Annotated[DiscordIdentity, Depends(require_user)],
+        identity: DiscordIdentity = Depends(require_user),
     ) -> CheckoutResponse:
         checkout_base = _setting("SERVERCORE_MEMBERSHIP_CHECKOUT_URL")
         if not checkout_base:
@@ -254,7 +258,7 @@ def create_portal_router(
 
     @router.get("/api/portal/tickets", response_model=list[SupportTicket])
     def my_tickets(
-        identity: Annotated[DiscordIdentity, Depends(require_user)],
+        identity: DiscordIdentity = Depends(require_user),
     ) -> list[SupportTicket]:
         return portal_store.list_tickets(discord_user_id=identity.discord_user_id)
 
@@ -265,7 +269,7 @@ def create_portal_router(
     )
     def create_ticket(
         payload: SupportTicketCreate,
-        identity: Annotated[DiscordIdentity, Depends(require_user)],
+        identity: DiscordIdentity = Depends(require_user),
     ) -> SupportTicket:
         return portal_store.create_ticket(identity, payload)
 
@@ -304,7 +308,7 @@ def create_portal_router(
     @router.post("/api/portal/features/{proposal_id}/vote", response_model=FeatureProposal)
     def vote_feature(
         proposal_id: UUID,
-        identity: Annotated[DiscordIdentity, Depends(require_user)],
+        identity: DiscordIdentity = Depends(require_user),
     ) -> FeatureProposal:
         try:
             return portal_store.vote_feature(proposal_id, identity.discord_user_id)
