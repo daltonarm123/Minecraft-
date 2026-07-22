@@ -18,9 +18,11 @@ from .models import (
     PlayerRecord,
     PlayerUpsert,
 )
+from .portal import create_portal_router
+from .portal_store import PortalStore, store as default_portal_store
 from .store import NetworkStore, store as default_store
 
-SERVICE_VERSION = "0.2.0"
+SERVICE_VERSION = "0.3.0"
 API_KEY = os.getenv("SERVERCORE_API_KEY", "").strip()
 ALLOWED_ORIGINS = [
     origin.strip()
@@ -49,21 +51,25 @@ def raise_store_error(exception: Exception) -> NoReturn:
     raise HTTPException(status_code=400, detail=str(exception)) from exception
 
 
-def create_app(network_store: NetworkStore | None = None) -> FastAPI:
+def create_app(
+    network_store: NetworkStore | None = None,
+    portal_store: PortalStore | None = None,
+) -> FastAPI:
     active_store = network_store or default_store
+    active_portal_store = portal_store or default_portal_store
     application = FastAPI(
         title="ServerCore Network API",
         version=SERVICE_VERSION,
         description=(
             "Internal service for player profiles, duels, cosmetics, leaderboards, "
-            "and audit events."
+            "audit events, and the Discord-authenticated player portal."
         ),
     )
     application.add_middleware(
         CORSMiddleware,
         allow_origins=ALLOWED_ORIGINS,
         allow_credentials=False,
-        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         allow_headers=["Accept", "Content-Type", "X-ServerCore-Key"],
     )
 
@@ -208,6 +214,11 @@ def create_app(network_store: NetworkStore | None = None) -> FastAPI:
     ) -> CosmeticPlayerState:
         return active_store.unequip_category(player_id, category)
 
+    application.include_router(
+        create_portal_router(active_store, active_portal_store, require_write_key)
+    )
+    application.state.network_store = active_store
+    application.state.portal_store = active_portal_store
     return application
 
 

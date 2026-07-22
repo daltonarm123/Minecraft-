@@ -53,6 +53,7 @@ public final class ServerCoreMod {
     @SubscribeEvent
     public void onRegisterCommands(RegisterCommandsEvent event) {
         ServerCoreCommands.register(event, () -> runtime);
+        AccountLinkCommands.register(event);
     }
 
     @SubscribeEvent
