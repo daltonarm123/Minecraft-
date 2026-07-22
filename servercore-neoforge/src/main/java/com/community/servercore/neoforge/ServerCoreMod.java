@@ -30,7 +30,7 @@ public final class ServerCoreMod {
 
     public ServerCoreMod(IEventBus modEventBus) {
         NeoForge.EVENT_BUS.register(this);
-        LOGGER.info("ServerCore NeoForge adapter loaded");
+        LOGGER.info("ServerCore NeoForge 1.21.1 test adapter loaded");
     }
 
     @SubscribeEvent
@@ -68,7 +68,7 @@ public final class ServerCoreMod {
 
         PortalUseResult result = current.portals().tryUse(
                 player.getUUID(),
-                player.level().dimension().identifier().toString(),
+                player.level().dimension().location().toString(),
                 player.getX(),
                 player.getY(),
                 player.getZ());
