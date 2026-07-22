@@ -3,6 +3,7 @@ from uuid import uuid4
 from fastapi.testclient import TestClient
 
 from app.main import create_app
+from app.models import PlayerUpsert
 from app.portal_models import DiscordIdentity
 from app.portal_store import PortalStore
 from app.store import NetworkStore
@@ -37,7 +38,7 @@ def test_linked_player_stats_and_achievements() -> None:
     api, network_store, _, _ = authenticated_client()
     player_id = uuid4()
     network_store.upsert_player(
-        __import__("app.models", fromlist=["PlayerUpsert"]).PlayerUpsert(
+        PlayerUpsert(
             player_id=player_id,
             username="MinerOne",
             wins=12,
