@@ -1,17 +1,17 @@
 [project]
 name = "servercore-network-api"
-version = "0.1.0"
-description = "Internal API for ServerCore player, duel, leaderboard, and audit data"
+version = "0.3.0"
+description = "Internal API and Discord-authenticated player portal for ServerCore"
 requires-python = ">=3.11"
 dependencies = [
   "fastapi>=0.116,<1.0",
+  "httpx>=0.28,<1.0",
   "pydantic>=2.11,<3.0",
   "uvicorn[standard]>=0.35,<1.0"
 ]
 
 [project.optional-dependencies]
 test = [
-  "httpx>=0.28,<1.0",
   "pytest>=8.4,<9.0"
 ]
 
