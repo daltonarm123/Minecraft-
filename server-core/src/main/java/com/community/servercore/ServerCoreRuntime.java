@@ -10,6 +10,7 @@ import com.community.servercore.command.PortalCommandService;
 import com.community.servercore.command.RoleCommandService;
 import com.community.servercore.command.StaffAreaCommandService;
 import com.community.servercore.config.JsonConfigLoader;
+import com.community.servercore.config.ServerCoreBootstrapSupport;
 import com.community.servercore.config.ServerCoreConfig;
 import com.community.servercore.cosmetic.CosmeticsService;
 import com.community.servercore.cosmetic.DefaultCosmeticCatalog;
@@ -105,8 +106,7 @@ public final class ServerCoreRuntime {
         Objects.requireNonNull(teleportService, "teleportService");
         Objects.requireNonNull(clock, "clock");
 
-        JsonConfigLoader configLoader = new JsonConfigLoader(normalizedDirectory.resolve("servercore.json"));
-        ServerCoreConfig config = configLoader.loadOrCreate();
+        ServerCoreConfig config = ServerCoreBootstrapSupport.ensureConfig(normalizedDirectory);
         JsonPortalRepository portalRepository = new JsonPortalRepository(
                 normalizedDirectory.resolve(config.portalFile()));
         PortalService portalService = new PortalService(

@@ -49,6 +49,35 @@ class StaffAreaCommandServiceTest {
                 .isEqualTo(RoleCommandService.DEV_AREA_PERMISSION);
     }
 
+    @Test
+    void createsBothRequiredStaffAreaPortalsInOneCall() {
+        PortalService portalService = new PortalService(
+                new InMemoryPortalRepository(),
+                new PortalValidator(),
+                new PortalCooldownService(),
+                (playerId, portal) -> true,
+                (playerId, destination) -> TeleportResult.success("ok"),
+                false);
+        PortalCommandService portalCommands = new PortalCommandService(
+                portalService,
+                new PortalSelectionService(),
+                20,
+                3);
+        StaffAreaCommandService staffAreas = new StaffAreaCommandService(portalCommands);
+        TestActor actor = new TestActor();
+
+        CommandResult result = staffAreas.ensureStaffAreaPortals(
+                actor,
+                "Developer Area",
+                "Admin Lounge",
+                PortalDestination.location("minecraft:overworld", 10, 70, 10, 0, 0),
+                PortalDestination.location("minecraft:overworld", 20, 70, 20, 0, 0));
+
+        assertThat(result.successful()).isTrue();
+        assertThat(portalService.findByName(StaffAreaCommandService.DEV_PORTAL_NAME)).isPresent();
+        assertThat(portalService.findByName(StaffAreaCommandService.ADMIN_PORTAL_NAME)).isPresent();
+    }
+
     private static final class TestActor implements CommandActor {
         private final UUID id = UUID.randomUUID();
         private WorldPosition position = new WorldPosition("minecraft:overworld", 0, 64, 0);

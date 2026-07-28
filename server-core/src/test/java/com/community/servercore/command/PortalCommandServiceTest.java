@@ -48,6 +48,46 @@ class PortalCommandServiceTest {
     }
 
     @Test
+    void ensureReportsExistingPortalWithoutCreatingDuplicates() {
+        PortalService portalService = new PortalService(
+                new InMemoryPortalRepository(),
+                new PortalValidator(),
+                new PortalCooldownService(),
+                (playerId, portal) -> true,
+                (playerId, destination) -> TeleportResult.success("ok"),
+                false);
+        PortalCommandService commands = new PortalCommandService(
+                portalService,
+                new PortalSelectionService(),
+                100,
+                3);
+        TestActor actor = new TestActor();
+
+        assertThat(commands.begin(actor, "staff-area").successful()).isTrue();
+        actor.position = new WorldPosition("minecraft:overworld", 0, 64, 0);
+        assertThat(commands.setFirst(actor, "staff-area").successful()).isTrue();
+        actor.position = new WorldPosition("minecraft:overworld", 3, 67, 1);
+        assertThat(commands.setSecond(actor, "staff-area").successful()).isTrue();
+        assertThat(commands.create(
+                actor,
+                "staff-area",
+                "Staff Area",
+                PortalDestination.location("minecraft:overworld", 100, 70, 100, 0, 0),
+                "").successful()).isTrue();
+
+        CommandResult result = commands.ensure(
+                actor,
+                "staff-area",
+                "Staff Area",
+                PortalDestination.location("minecraft:overworld", 200, 70, 200, 0, 0),
+                "");
+
+        assertThat(result.successful()).isTrue();
+        assertThat(result.messages()).contains("Portal 'staff-area' already exists.");
+        assertThat(portalService.list()).hasSize(1);
+    }
+
+    @Test
     void deniesNonAdministrator() {
         PortalService portalService = new PortalService(
                 new InMemoryPortalRepository(),

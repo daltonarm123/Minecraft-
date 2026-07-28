@@ -2,6 +2,7 @@ package com.community.servercore.command;
 
 import com.community.servercore.portal.PortalDestination;
 
+import java.util.List;
 import java.util.Objects;
 
 public final class StaffAreaCommandService {
@@ -15,7 +16,7 @@ public final class StaffAreaCommandService {
     }
 
     public CommandResult createDevAreaPortal(CommandActor actor, String displayName, PortalDestination destination) {
-        return portalCommands.create(
+        return portalCommands.ensure(
                 actor,
                 DEV_PORTAL_NAME,
                 displayName == null || displayName.isBlank() ? "Developer Test Area" : displayName,
@@ -24,11 +25,40 @@ public final class StaffAreaCommandService {
     }
 
     public CommandResult createAdminLoungePortal(CommandActor actor, String displayName, PortalDestination destination) {
-        return portalCommands.create(
+        return portalCommands.ensure(
                 actor,
                 ADMIN_PORTAL_NAME,
                 displayName == null || displayName.isBlank() ? "Admin Lounge" : displayName,
                 destination,
                 RoleCommandService.ADMIN_AREA_PERMISSION);
+    }
+
+    public CommandResult ensureStaffAreaPortals(
+            CommandActor actor,
+            String devDisplayName,
+            String adminDisplayName,
+            PortalDestination devDestination,
+            PortalDestination adminDestination) {
+        CommandResult devResult = portalCommands.createDefaultPortal(
+                actor,
+                DEV_PORTAL_NAME,
+                devDisplayName == null || devDisplayName.isBlank() ? "Developer Test Area" : devDisplayName,
+                devDestination,
+                RoleCommandService.DEV_AREA_PERMISSION);
+        if (!devResult.successful() && !devResult.messages().getFirst().contains("already exists")) {
+            return devResult;
+        }
+        CommandResult adminResult = portalCommands.createDefaultPortal(
+                actor,
+                ADMIN_PORTAL_NAME,
+                adminDisplayName == null || adminDisplayName.isBlank() ? "Admin Lounge" : adminDisplayName,
+                adminDestination,
+                RoleCommandService.ADMIN_AREA_PERMISSION);
+        if (!adminResult.successful() && !adminResult.messages().getFirst().contains("already exists")) {
+            return adminResult;
+        }
+        return CommandResult.success(List.of(
+                devResult.messages().getFirst(),
+                adminResult.messages().getFirst()));
     }
 }

@@ -2,6 +2,7 @@ package com.community.servercore.command;
 
 import com.community.servercore.portal.Portal;
 import com.community.servercore.portal.PortalDestination;
+import com.community.servercore.portal.PortalRegion;
 import com.community.servercore.selection.PortalSelection;
 import com.community.servercore.selection.PortalSelectionService;
 import com.community.servercore.selection.WorldPosition;
@@ -67,6 +68,10 @@ public final class PortalCommandService {
             String displayName,
             PortalDestination destination,
             String permission) {
+        String normalizedPortalName = normalizePortalName(portalName);
+        if (normalizedPortalName.isBlank()) {
+            return CommandResult.failure("Portal name must not be blank.");
+        }
         if (!authorized(actor)) {
             return denied();
         }
@@ -74,7 +79,7 @@ public final class PortalCommandService {
             return CommandResult.failure("The configured portal limit has been reached.");
         }
         Optional<PortalSelection> selected = selectionService.get(actor.id());
-        if (selected.isEmpty() || !selected.orElseThrow().portalName().equalsIgnoreCase(portalName)) {
+        if (selected.isEmpty() || !selected.orElseThrow().portalName().equalsIgnoreCase(normalizedPortalName)) {
             return CommandResult.failure("Select both corners for this portal before creating it.");
         }
         PortalSelection selection = selected.orElseThrow();
@@ -85,15 +90,15 @@ public final class PortalCommandService {
         try {
             Portal portal = new Portal(
                     UUID.randomUUID(),
-                    portalName,
-                    displayName == null || displayName.isBlank() ? portalName : displayName,
+                    normalizedPortalName,
+                    displayName == null || displayName.isBlank() ? normalizedPortalName : displayName,
                     selection.world().orElseThrow(),
                     selection.region().orElseThrow(),
                     Objects.requireNonNull(destination, "destination"),
                     true,
                     permission == null ? "" : permission,
                     defaultCooldownSeconds,
-                    "Entering " + (displayName == null || displayName.isBlank() ? portalName : displayName) + "...",
+                    "Entering " + (displayName == null || displayName.isBlank() ? normalizedPortalName : displayName) + "...",
                     "You cannot use this portal.",
                     Map.of("createdBy", actor.name()));
             PortalMutationResult result = portalService.save(portal);
@@ -101,6 +106,68 @@ public final class PortalCommandService {
                 return CommandResult.failure(String.join("; ", result.errors()));
             }
             selectionService.clear(actor.id());
+            return CommandResult.success("Created portal '" + portal.name() + "'.");
+        } catch (IOException exception) {
+            return CommandResult.failure("Unable to save the portal: " + exception.getMessage());
+        } catch (IllegalArgumentException | NullPointerException exception) {
+            return CommandResult.failure(exception.getMessage());
+        }
+    }
+
+    public CommandResult ensure(
+            CommandActor actor,
+            String portalName,
+            String displayName,
+            PortalDestination destination,
+            String permission) {
+        String normalizedPortalName = normalizePortalName(portalName);
+        if (normalizedPortalName.isBlank()) {
+            return CommandResult.failure("Portal name must not be blank.");
+        }
+        if (!authorized(actor)) {
+            return denied();
+        }
+        if (portalService.findByName(normalizedPortalName).isPresent()) {
+            return CommandResult.success("Portal '" + normalizedPortalName + "' already exists.");
+        }
+        return create(actor, normalizedPortalName, displayName, destination, permission);
+    }
+
+    public CommandResult createDefaultPortal(
+            CommandActor actor,
+            String portalName,
+            String displayName,
+            PortalDestination destination,
+            String permission) {
+        String normalizedPortalName = normalizePortalName(portalName);
+        if (normalizedPortalName.isBlank()) {
+            return CommandResult.failure("Portal name must not be blank.");
+        }
+        if (!authorized(actor)) {
+            return denied();
+        }
+        if (portalService.findByName(normalizedPortalName).isPresent()) {
+            return CommandResult.success("Portal '" + normalizedPortalName + "' already exists.");
+        }
+        try {
+            PortalRegion region = defaultBootstrapRegion(normalizedPortalName);
+            Portal portal = new Portal(
+                    UUID.randomUUID(),
+                    normalizedPortalName,
+                    displayName == null || displayName.isBlank() ? normalizedPortalName : displayName,
+                    destination == null ? "minecraft:overworld" : destination.target(),
+                    region,
+                    Objects.requireNonNull(destination, "destination"),
+                    true,
+                    permission == null ? "" : permission,
+                    defaultCooldownSeconds,
+                    "Entering " + (displayName == null || displayName.isBlank() ? normalizedPortalName : displayName) + "...",
+                    "You cannot use this portal.",
+                    Map.of("createdBy", actor.name()));
+            PortalMutationResult result = portalService.save(portal);
+            if (!result.successful()) {
+                return CommandResult.failure(String.join("; ", result.errors()));
+            }
             return CommandResult.success("Created portal '" + portal.name() + "'.");
         } catch (IOException exception) {
             return CommandResult.failure("Unable to save the portal: " + exception.getMessage());
@@ -190,6 +257,15 @@ public final class PortalCommandService {
 
     private static boolean authorized(CommandActor actor) {
         return actor != null && actor.hasPermission(ADMIN_PERMISSION);
+    }
+
+    private static PortalRegion defaultBootstrapRegion(String portalName) {
+        int offset = Math.floorMod(portalName == null ? 0 : portalName.hashCode(), 1000);
+        return new PortalRegion(offset, 0, 0, offset + 1, 1, 1);
+    }
+
+    private static String normalizePortalName(String portalName) {
+        return portalName == null ? "" : portalName.trim();
     }
 
     private static CommandResult denied() {

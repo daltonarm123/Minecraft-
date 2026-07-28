@@ -32,7 +32,17 @@ final class ServerCoreCommands {
         event.getDispatcher().register(Commands.literal("servercore")
                 .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
                 .then(Commands.literal("status")
-                        .executes(context -> status(context.getSource(), runtimeSupplier))));
+                        .executes(context -> status(context.getSource(), runtimeSupplier)))
+                .then(Commands.literal("setup")
+                        .executes(context -> executePlayer(
+                                context.getSource(),
+                                runtimeSupplier,
+                                (runtime, actor) -> runtime.staffAreas().ensureStaffAreaPortals(
+                                        actor,
+                                        "Developer Test Area",
+                                        "Admin Lounge",
+                                        PortalDestination.location("minecraft:overworld", 100, 70, 100, 0, 0),
+                                        PortalDestination.location("minecraft:overworld", 200, 70, 200, 0, 0))))));
 
         LiteralArgumentBuilder<CommandSourceStack> portal = Commands.literal("portal");
         portal.requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS));
