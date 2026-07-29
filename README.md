@@ -124,6 +124,21 @@ API: `http://localhost:8000`
 API docs: `http://localhost:8000/docs`  
 Player portal: `http://localhost:8000/portal`
 
+## Handy local server scripts
+
+From the repository root you can use:
+
+```bash
+./scripts/start-dev.sh
+./scripts/stop-dev.sh
+./scripts/smoke-test.sh
+./scripts/health-check.sh
+./scripts/backup.sh
+./scripts/watchdog.sh
+./scripts/reset-dev.sh
+./scripts/build-all.sh
+```
+
 ## Current limitations
 
 - The API and player portal currently use in-memory storage; PostgreSQL is required before public launch.
