@@ -61,6 +61,22 @@ class MembershipRecord(BaseModel):
     updated_at: datetime = Field(default_factory=utc_now)
 
 
+class MembershipRewardType(StrEnum):
+    CURRENCY = "CURRENCY"
+    COSMETIC = "COSMETIC"
+    VOUCHER = "VOUCHER"
+
+
+class MembershipReward(BaseModel):
+    reward_id: str
+    reward_type: MembershipRewardType
+    title: str
+    description: str
+    amount: int | None = None
+    claimed: bool = False
+    expires_at: datetime | None = None
+
+
 class MembershipUpdate(BaseModel):
     plan: str = Field(default="founder", min_length=1, max_length=64)
     status: MembershipStatus

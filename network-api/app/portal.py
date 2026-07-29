@@ -20,6 +20,7 @@ from .portal_models import (
     LinkChallenge,
     LinkConfirmation,
     MembershipRecord,
+    MembershipReward,
     MembershipUpdate,
     MinecraftLink,
     PlayerAchievement,
@@ -244,6 +245,22 @@ def create_portal_router(
         if not checkout_base:
             raise HTTPException(status_code=503, detail="Membership checkout is not configured")
         return CheckoutResponse(checkout_url=_checkout_url(checkout_base, identity))
+
+    @router.get("/api/portal/membership/rewards", response_model=list[MembershipReward])
+    def membership_rewards(
+        identity: DiscordIdentity = Depends(require_user),
+    ) -> list[MembershipReward]:
+        return portal_store.list_membership_rewards(identity.discord_user_id)
+
+    @router.post("/api/portal/membership/rewards/{reward_id}/claim", response_model=MembershipReward)
+    def claim_membership_reward(
+        reward_id: str,
+        identity: DiscordIdentity = Depends(require_user),
+    ) -> MembershipReward:
+        try:
+            return portal_store.claim_membership_reward(identity.discord_user_id, reward_id)
+        except ValueError as exception:
+            raise HTTPException(status_code=400, detail=str(exception)) from exception
 
     @router.put(
         "/api/portal/admin/memberships/{discord_user_id}",

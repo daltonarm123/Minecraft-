@@ -100,6 +100,28 @@ def test_feature_votes_are_one_per_discord_account() -> None:
     assert second_vote.json()["vote_count"] == 1
 
 
+def test_membership_rewards_are_listed_and_claimed() -> None:
+    api, _, _, identity = authenticated_client()
+
+    api.put(
+        f"/api/portal/admin/memberships/{identity.discord_user_id}",
+        json={"plan": "founder", "status": "ACTIVE"},
+    )
+
+    rewards = api.get("/api/portal/membership/rewards")
+    assert rewards.status_code == 200
+    assert len(rewards.json()) >= 1
+
+    reward_id = rewards.json()[0]["reward_id"]
+    claimed = api.post(f"/api/portal/membership/rewards/{reward_id}/claim")
+    assert claimed.status_code == 200
+    assert claimed.json()["claimed"] is True
+
+    refreshed = api.get("/api/portal/membership/rewards")
+    claimed_reward = next(item for item in refreshed.json() if item["reward_id"] == reward_id)
+    assert claimed_reward["claimed"] is True
+
+
 def test_membership_admin_update_and_unconfigured_checkout() -> None:
     api, _, _, identity = authenticated_client()
 

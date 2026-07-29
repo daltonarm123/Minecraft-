@@ -11,6 +11,8 @@ from .portal_models import (
     FeatureProposalCreate,
     LinkChallenge,
     MembershipRecord,
+    MembershipReward,
+    MembershipRewardType,
     MembershipUpdate,
     MinecraftLink,
     SupportTicket,
@@ -38,6 +40,7 @@ class PortalStore:
         self._links_by_discord: dict[str, MinecraftLink] = {}
         self._discord_by_player: dict[UUID, str] = {}
         self._memberships: dict[str, MembershipRecord] = {}
+        self._reward_claims: dict[tuple[str, str], bool] = {}
         self._tickets: dict[UUID, SupportTicket] = {}
         self._features: dict[UUID, FeatureProposal] = {}
         self._feature_votes: dict[UUID, set[str]] = {}
@@ -158,6 +161,51 @@ class PortalStore:
         with self._lock:
             self._memberships[discord_user_id] = membership
             return membership.model_copy(deep=True)
+
+    def list_membership_rewards(self, discord_user_id: str) -> list[MembershipReward]:
+        membership = self.get_membership(discord_user_id)
+        reward_templates = [
+            MembershipReward(
+                reward_id="monthly-currency",
+                reward_type=MembershipRewardType.CURRENCY,
+                title="Monthly support currency",
+                description="A monthly grant of 500 server currency for active members.",
+                amount=500,
+            ),
+            MembershipReward(
+                reward_id="cosmetic-boost",
+                reward_type=MembershipRewardType.COSMETIC,
+                title="Supporter cosmetic voucher",
+                description="Claim one monthly cosmetic voucher for your supporter bundle.",
+            ),
+        ]
+        if membership.status != "ACTIVE":
+            reward_templates = [
+                reward.model_copy(update={"claimed": True}) for reward in reward_templates
+            ]
+        with self._lock:
+            rewards = []
+            for reward in reward_templates:
+                reward_key = (discord_user_id, reward.reward_id)
+                claimed = self._reward_claims.get(reward_key, False)
+                rewards.append(reward.model_copy(update={"claimed": claimed}))
+            return rewards
+
+    def claim_membership_reward(self, discord_user_id: str, reward_id: str) -> MembershipReward:
+        with self._lock:
+            membership = self._memberships.get(discord_user_id)
+            if membership is None or membership.status != "ACTIVE":
+                raise ValueError("Membership must be active to claim rewards")
+            reward_key = (discord_user_id, reward_id)
+            if self._reward_claims.get(reward_key, False):
+                raise ValueError("Reward already claimed")
+            self._reward_claims[reward_key] = True
+            reward = next(
+                reward
+                for reward in self.list_membership_rewards(discord_user_id)
+                if reward.reward_id == reward_id
+            )
+            return reward.model_copy(update={"claimed": True})
 
     def create_ticket(
         self,
