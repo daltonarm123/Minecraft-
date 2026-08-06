@@ -78,6 +78,7 @@ class MembershipReward(BaseModel):
 
 
 class MembershipUpdate(BaseModel):
+    discord_user_id: str | None = Field(default=None, min_length=1, max_length=32)
     plan: str = Field(default="founder", min_length=1, max_length=64)
     status: MembershipStatus
     current_period_end: datetime | None = None

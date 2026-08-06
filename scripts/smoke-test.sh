@@ -9,8 +9,8 @@ if ! command -v curl >/dev/null 2>&1; then
   exit 2
 fi
 
-if ! docker compose -f "$ROOT/infrastructure/docker-compose.yml" ps --services --filter status=running | grep -q '^network-api$'; then
-  echo "API container is not running. Start it with ./scripts/start-dev.sh" >&2
+if ! curl -fsS http://localhost:8000/health >/dev/null 2>&1; then
+  echo "API is not responding. Start it with ./scripts/start-dev.sh" >&2
   exit 1
 fi
 

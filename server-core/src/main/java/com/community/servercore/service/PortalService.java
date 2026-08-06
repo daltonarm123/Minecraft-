@@ -1,6 +1,7 @@
 package com.community.servercore.service;
 
 import com.community.servercore.portal.Portal;
+import com.community.servercore.portal.PortalDestination;
 import com.community.servercore.storage.PortalRepository;
 
 import java.io.IOException;
@@ -18,6 +19,7 @@ public final class PortalService {
     private final PortalCooldownService cooldownService;
     private final PortalAccessService accessService;
     private final PortalTeleportService teleportService;
+    private final PortalResolver resolver;
     private final boolean allowOverlaps;
     private final Set<UUID> teleportingPlayers = ConcurrentHashMap.newKeySet();
 
@@ -27,12 +29,14 @@ public final class PortalService {
             PortalCooldownService cooldownService,
             PortalAccessService accessService,
             PortalTeleportService teleportService,
+            PortalResolver resolver,
             boolean allowOverlaps) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.validator = Objects.requireNonNull(validator, "validator");
         this.cooldownService = Objects.requireNonNull(cooldownService, "cooldownService");
         this.accessService = Objects.requireNonNull(accessService, "accessService");
         this.teleportService = Objects.requireNonNull(teleportService, "teleportService");
+        this.resolver = Objects.requireNonNull(resolver, "resolver");
         this.allowOverlaps = allowOverlaps;
     }
 
@@ -137,7 +141,9 @@ public final class PortalService {
         }
 
         try {
-            TeleportResult teleport = teleportService.teleport(playerId, portal.destination());
+            PortalDestination resolvedDestination = resolver.resolve(portal.destination())
+                    .orElse(portal.destination());
+            TeleportResult teleport = teleportService.teleport(playerId, resolvedDestination);
             if (!teleport.successful()) {
                 return PortalUseResult.of(PortalUseStatus.TELEPORT_FAILED, portal, teleport.message());
             }

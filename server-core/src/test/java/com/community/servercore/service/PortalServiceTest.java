@@ -109,6 +109,7 @@ class PortalServiceTest {
                 new PortalCooldownService(clock),
                 accessService,
                 teleportService,
+                PortalResolver.identity(),
                 false);
     }
 

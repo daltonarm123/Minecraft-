@@ -1,0 +1,72 @@
+{
+  "discord_by_player": {},
+  "feature_votes": {
+    "286b8d9b-eb98-49c3-9a73-da120bcb7ac3": [],
+    "8641494d-e0f8-4390-8418-663953eccb88": [],
+    "a9017726-7190-4fa5-bcd2-db7fa66fcd26": []
+  },
+  "features": {
+    "286b8d9b-eb98-49c3-9a73-da120bcb7ac3": {
+      "created_at": "2026-08-06T00:38:38.428182Z",
+      "description": "Complete and test the Bedrock bridge for console and mobile players.",
+      "proposal_id": "286b8d9b-eb98-49c3-9a73-da120bcb7ac3",
+      "status": "OPEN",
+      "title": "Cross-play launch",
+      "vote_count": 0
+    },
+    "8641494d-e0f8-4390-8418-663953eccb88": {
+      "created_at": "2026-08-06T00:38:38.429297Z",
+      "description": "Let members browse server market listings from the web portal.",
+      "proposal_id": "8641494d-e0f8-4390-8418-663953eccb88",
+      "status": "OPEN",
+      "title": "Player marketplace dashboard",
+      "vote_count": 0
+    },
+    "a9017726-7190-4fa5-bcd2-db7fa66fcd26": {
+      "created_at": "2026-08-06T00:38:38.428852Z",
+      "description": "Add rotating quests with cosmetic rewards and leaderboard points.",
+      "proposal_id": "a9017726-7190-4fa5-bcd2-db7fa66fcd26",
+      "status": "OPEN",
+      "title": "Seasonal quests",
+      "vote_count": 0
+    }
+  },
+  "link_challenges": {},
+  "links_by_discord": {},
+  "memberships": {
+    "123456": {
+      "current_period_end": "2030-01-01T00:00:00Z",
+      "discord_user_id": "123456",
+      "plan": "founder",
+      "status": "ACTIVE",
+      "updated_at": "2026-08-06T00:38:38.725019Z"
+    },
+    "789012": {
+      "current_period_end": null,
+      "discord_user_id": "789012",
+      "plan": "founder",
+      "status": "ACTIVE",
+      "updated_at": "2026-08-06T00:38:39.005872Z"
+    }
+  },
+  "oauth_states": {},
+  "reward_claims": [],
+  "sessions": {},
+  "tickets": {},
+  "webhook_results": {
+    "5657eb66aea93b81bce3a31d7c91fad7183a05cdebbefeb53d6a18cd3d569a47": {
+      "current_period_end": null,
+      "discord_user_id": "789012",
+      "plan": "founder",
+      "status": "ACTIVE",
+      "updated_at": "2026-08-06T00:38:39.005872Z"
+    },
+    "56a502506eac62a452c32a838484e2fa9078bb499a72232e8d69c3a7628a06e0": {
+      "current_period_end": "2030-01-01T00:00:00Z",
+      "discord_user_id": "123456",
+      "plan": "founder",
+      "status": "ACTIVE",
+      "updated_at": "2026-08-06T00:38:38.725019Z"
+    }
+  }
+}

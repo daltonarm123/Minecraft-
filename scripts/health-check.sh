@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-
 if curl -fsS http://localhost:8000/health >/dev/null 2>&1; then
   echo "healthy"
   exit 0

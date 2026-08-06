@@ -1,5 +1,7 @@
 package com.community.servercore.config;
 
+import java.util.Collections;
+import java.util.Map;
 import java.util.Objects;
 
 public record ServerCoreConfig(
@@ -12,7 +14,8 @@ public record ServerCoreConfig(
         int defaultCooldownSeconds,
         boolean logPortalUsage,
         String apiBaseUrl,
-        int apiTimeoutSeconds) {
+        int apiTimeoutSeconds,
+        Map<String, String> portalRouting) {
 
     public ServerCoreConfig {
         if (portalCheckIntervalTicks < 1 || portalCheckIntervalTicks > 200) {
@@ -33,6 +36,8 @@ public record ServerCoreConfig(
         if (apiTimeoutSeconds < 1 || apiTimeoutSeconds > 120) {
             throw new IllegalArgumentException("apiTimeoutSeconds must be between 1 and 120");
         }
+        portalRouting = Objects.requireNonNullElse(portalRouting, Collections.emptyMap());
+        portalRouting = Map.copyOf(portalRouting);
     }
 
     public static ServerCoreConfig defaults() {
@@ -46,7 +51,8 @@ public record ServerCoreConfig(
                 3,
                 true,
                 "",
-                10);
+                10,
+                Collections.emptyMap());
     }
 
     private static String requireText(String value, String field) {

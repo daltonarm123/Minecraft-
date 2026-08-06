@@ -4,6 +4,7 @@ import com.community.servercore.portal.PortalDestination;
 import com.community.servercore.selection.PortalSelectionService;
 import com.community.servercore.selection.WorldPosition;
 import com.community.servercore.service.PortalCooldownService;
+import com.community.servercore.service.PortalResolver;
 import com.community.servercore.service.PortalService;
 import com.community.servercore.service.PortalValidator;
 import com.community.servercore.service.TeleportResult;
@@ -23,6 +24,7 @@ class StaffAreaCommandServiceTest {
                 new PortalCooldownService(),
                 (playerId, portal) -> true,
                 (playerId, destination) -> TeleportResult.success("ok"),
+                PortalResolver.identity(),
                 false);
         PortalCommandService portalCommands = new PortalCommandService(
                 portalService,
@@ -57,6 +59,7 @@ class StaffAreaCommandServiceTest {
                 new PortalCooldownService(),
                 (playerId, portal) -> true,
                 (playerId, destination) -> TeleportResult.success("ok"),
+                PortalResolver.identity(),
                 false);
         PortalCommandService portalCommands = new PortalCommandService(
                 portalService,

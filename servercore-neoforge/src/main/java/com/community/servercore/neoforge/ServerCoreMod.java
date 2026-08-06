@@ -30,6 +30,7 @@ public final class ServerCoreMod {
 
     public ServerCoreMod(IEventBus modEventBus) {
         NeoForge.EVENT_BUS.register(this);
+        NeoForge.EVENT_BUS.register(new NeoForgeCombatEvents(() -> runtime));
         LOGGER.info("ServerCore NeoForge adapter loaded");
     }
 
