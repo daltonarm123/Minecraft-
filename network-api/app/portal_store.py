@@ -1,7 +1,11 @@
 from __future__ import annotations
 
+import hashlib
+import json
+import os
 import secrets
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from threading import RLock
 from uuid import UUID
 
@@ -32,19 +36,26 @@ class PortalStore:
     PostgreSQL before accepting public subscriptions or support requests.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, storage_path: str | Path | None = None) -> None:
         self._lock = RLock()
+        self._path = Path(storage_path or os.getenv("SERVERCORE_PORTAL_STORE_PATH", "portal-store.json"))
+        self._path = self._path.expanduser()
+        self._path.parent.mkdir(parents=True, exist_ok=True)
         self._oauth_states: dict[str, datetime] = {}
         self._sessions: dict[str, tuple[DiscordIdentity, datetime]] = {}
         self._link_challenges: dict[str, LinkChallenge] = {}
         self._links_by_discord: dict[str, MinecraftLink] = {}
         self._discord_by_player: dict[UUID, str] = {}
         self._memberships: dict[str, MembershipRecord] = {}
+        self._webhook_results: dict[str, MembershipRecord] = {}
         self._reward_claims: dict[tuple[str, str], bool] = {}
         self._tickets: dict[UUID, SupportTicket] = {}
         self._features: dict[UUID, FeatureProposal] = {}
         self._feature_votes: dict[UUID, set[str]] = {}
-        self._seed_features()
+        if self._path.exists():
+            self._load_from_disk()
+        if not self._features:
+            self._seed_features()
 
     def create_oauth_state(self, *, ttl: timedelta = timedelta(minutes=10)) -> str:
         state = secrets.token_urlsafe(24)
@@ -66,6 +77,7 @@ class PortalStore:
         token = secrets.token_urlsafe(32)
         with self._lock:
             self._sessions[token] = (identity.model_copy(deep=True), utc_now() + ttl)
+            self._persist()
         return token
 
     def get_session(self, token: str | None) -> DiscordIdentity | None:
@@ -86,6 +98,7 @@ class PortalStore:
             return
         with self._lock:
             self._sessions.pop(token, None)
+            self._persist()
 
     def create_link_challenge(
         self,
@@ -108,6 +121,7 @@ class PortalStore:
                 expires_at=utc_now() + ttl,
             )
             self._link_challenges[code] = challenge
+            self._persist()
             return challenge.model_copy(deep=True)
 
     def confirm_link(self, code: str, player_id: UUID, username: str) -> MinecraftLink:
@@ -132,6 +146,7 @@ class PortalStore:
             )
             self._links_by_discord[challenge.discord_user_id] = link
             self._discord_by_player[player_id] = challenge.discord_user_id
+            self._persist()
             return link.model_copy(deep=True)
 
     def get_link(self, discord_user_id: str) -> MinecraftLink | None:
@@ -160,6 +175,29 @@ class PortalStore:
         )
         with self._lock:
             self._memberships[discord_user_id] = membership
+            self._persist()
+            return membership.model_copy(deep=True)
+
+    def process_membership_webhook(self, update: MembershipUpdate, body: bytes) -> MembershipRecord:
+        if not update.discord_user_id:
+            raise ValueError("discord_user_id is required")
+
+        fingerprint = hashlib.sha256(body).hexdigest()
+        with self._lock:
+            existing = self._webhook_results.get(fingerprint)
+            if existing is not None:
+                return existing.model_copy(deep=True)
+
+            membership = MembershipRecord(
+                discord_user_id=update.discord_user_id,
+                plan=update.plan,
+                status=update.status,
+                current_period_end=update.current_period_end,
+                updated_at=utc_now(),
+            )
+            self._memberships[update.discord_user_id] = membership
+            self._webhook_results[fingerprint] = membership
+            self._persist()
             return membership.model_copy(deep=True)
 
     def list_membership_rewards(self, discord_user_id: str) -> list[MembershipReward]:
@@ -200,6 +238,7 @@ class PortalStore:
             if self._reward_claims.get(reward_key, False):
                 raise ValueError("Reward already claimed")
             self._reward_claims[reward_key] = True
+            self._persist()
             reward = next(
                 reward
                 for reward in self.list_membership_rewards(discord_user_id)
@@ -220,6 +259,7 @@ class PortalStore:
         )
         with self._lock:
             self._tickets[ticket.ticket_id] = ticket
+            self._persist()
             return ticket.model_copy(deep=True)
 
     def list_tickets(self, *, discord_user_id: str | None = None) -> list[SupportTicket]:
@@ -237,6 +277,7 @@ class PortalStore:
                 raise KeyError("Support ticket not found")
             updated = ticket.model_copy(update={"status": status, "updated_at": utc_now()})
             self._tickets[ticket_id] = updated
+            self._persist()
             return updated.model_copy(deep=True)
 
     def create_feature(self, payload: FeatureProposalCreate) -> FeatureProposal:
@@ -247,6 +288,7 @@ class PortalStore:
         with self._lock:
             self._features[proposal.proposal_id] = proposal
             self._feature_votes[proposal.proposal_id] = set()
+            self._persist()
             return proposal.model_copy(deep=True)
 
     def list_features(self) -> list[FeatureProposal]:
@@ -266,7 +308,113 @@ class PortalStore:
             voters.add(discord_user_id)
             updated = proposal.model_copy(update={"vote_count": len(voters)})
             self._features[proposal_id] = updated
+            self._persist()
             return updated.model_copy(deep=True)
+
+    def _persist(self) -> None:
+        payload = {
+            "oauth_states": {
+                key: value.isoformat() for key, value in self._oauth_states.items()
+            },
+            "sessions": {
+                token: {
+                    "identity": identity.model_dump(mode="json"),
+                    "expires_at": expires_at.isoformat(),
+                }
+                for token, (identity, expires_at) in self._sessions.items()
+            },
+            "link_challenges": {
+                code: challenge.model_dump(mode="json") for code, challenge in self._link_challenges.items()
+            },
+            "links_by_discord": {
+                discord_user_id: link.model_dump(mode="json")
+                for discord_user_id, link in self._links_by_discord.items()
+            },
+            "discord_by_player": {
+                str(player_id): discord_user_id for player_id, discord_user_id in self._discord_by_player.items()
+            },
+            "memberships": {
+                discord_user_id: membership.model_dump(mode="json")
+                for discord_user_id, membership in self._memberships.items()
+            },
+            "webhook_results": {
+                fingerprint: membership.model_dump(mode="json")
+                for fingerprint, membership in self._webhook_results.items()
+            },
+            "reward_claims": [
+                [discord_user_id, reward_id, claimed]
+                for (discord_user_id, reward_id), claimed in self._reward_claims.items()
+            ],
+            "tickets": {
+                str(ticket_id): ticket.model_dump(mode="json") for ticket_id, ticket in self._tickets.items()
+            },
+            "features": {
+                str(proposal_id): proposal.model_dump(mode="json")
+                for proposal_id, proposal in self._features.items()
+            },
+            "feature_votes": {
+                str(proposal_id): sorted(voters)
+                for proposal_id, voters in self._feature_votes.items()
+            },
+        }
+        temporary_path = self._path.with_suffix(self._path.suffix + ".tmp")
+        with temporary_path.open("w", encoding="utf-8") as handle:
+            json.dump(payload, handle, indent=2, sort_keys=True)
+        temporary_path.replace(self._path)
+
+    def _load_from_disk(self) -> None:
+        with self._path.open("r", encoding="utf-8") as handle:
+            payload = json.load(handle)
+
+        self._oauth_states = {
+            key: datetime.fromisoformat(value) if isinstance(value, str) else value
+            for key, value in payload.get("oauth_states", {}).items()
+        }
+        self._sessions = {
+            token: (
+                DiscordIdentity.model_validate(item["identity"]),
+                datetime.fromisoformat(item["expires_at"]),
+            )
+            for token, item in payload.get("sessions", {}).items()
+            if datetime.fromisoformat(item["expires_at"]) > utc_now()
+        }
+        self._link_challenges = {
+            code: LinkChallenge.model_validate(item)
+            for code, item in payload.get("link_challenges", {}).items()
+            if LinkChallenge.model_validate(item).expires_at > utc_now()
+        }
+        self._links_by_discord = {
+            discord_user_id: MinecraftLink.model_validate(item)
+            for discord_user_id, item in payload.get("links_by_discord", {}).items()
+        }
+        self._discord_by_player = {
+            UUID(player_id): discord_user_id
+            for player_id, discord_user_id in payload.get("discord_by_player", {}).items()
+        }
+        self._memberships = {
+            discord_user_id: MembershipRecord.model_validate(item)
+            for discord_user_id, item in payload.get("memberships", {}).items()
+        }
+        self._webhook_results = {
+            fingerprint: MembershipRecord.model_validate(item)
+            for fingerprint, item in payload.get("webhook_results", {}).items()
+        }
+        self._reward_claims = {
+            (discord_user_id, reward_id): bool(claimed)
+            for discord_user_id, reward_id, claimed in payload.get("reward_claims", [])
+        }
+        self._tickets = {
+            UUID(ticket_id): SupportTicket.model_validate(item)
+            for ticket_id, item in payload.get("tickets", {}).items()
+        }
+        self._features = {
+            UUID(proposal_id): FeatureProposal.model_validate(item)
+            for proposal_id, item in payload.get("features", {}).items()
+        }
+        self._feature_votes = {
+            UUID(proposal_id): set(voters)
+            for proposal_id, voters in payload.get("feature_votes", {}).items()
+        }
 
     def _seed_features(self) -> None:
         defaults = (

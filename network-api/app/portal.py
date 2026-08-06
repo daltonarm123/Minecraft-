@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import hmac
 import os
 from collections.abc import Callable
 from pathlib import Path
@@ -7,7 +9,7 @@ from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 from uuid import UUID
 
 import httpx
-from fastapi import APIRouter, Cookie, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Query, Request, Response, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from .models import LeaderboardEntry, PlayerRecord
@@ -236,6 +238,30 @@ def create_portal_router(
         identity: DiscordIdentity = Depends(require_user),
     ) -> MembershipRecord:
         return portal_store.get_membership(identity.discord_user_id)
+
+    @router.post("/api/portal/membership/webhook", response_model=MembershipRecord)
+    async def membership_webhook(request: Request, payload: MembershipUpdate) -> MembershipRecord:
+        if not payload.discord_user_id:
+            raise HTTPException(status_code=400, detail="discord_user_id is required")
+
+        webhook_secret = _setting("SERVERCORE_WEBHOOK_SECRET")
+        if not webhook_secret:
+            raise HTTPException(status_code=503, detail="Webhook secret is not configured")
+
+        signature_header = request.headers.get("X-ServerCore-Signature", "")
+        if not signature_header.startswith("sha256="):
+            raise HTTPException(status_code=401, detail="Missing or invalid webhook signature")
+
+        body = await request.body()
+        expected_signature = "sha256=" + hmac.new(
+            webhook_secret.encode("utf-8"),
+            body,
+            hashlib.sha256,
+        ).hexdigest()
+        if not hmac.compare_digest(expected_signature, signature_header):
+            raise HTTPException(status_code=401, detail="Missing or invalid webhook signature")
+
+        return portal_store.process_membership_webhook(payload, body)
 
     @router.post("/api/portal/membership/checkout", response_model=CheckoutResponse)
     def membership_checkout(

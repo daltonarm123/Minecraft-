@@ -44,7 +44,8 @@ public final class JsonConfigLoader {
                     config.defaultCooldownSeconds(),
                     config.logPortalUsage(),
                     config.apiBaseUrl(),
-                    config.apiTimeoutSeconds());
+                    config.apiTimeoutSeconds(),
+                    config.portalRouting());
         } catch (RuntimeException exception) {
             throw new IOException("Invalid ServerCore configuration: " + file, exception);
         }

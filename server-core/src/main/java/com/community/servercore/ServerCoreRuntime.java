@@ -23,8 +23,10 @@ import com.community.servercore.player.PlayerStatsService;
 import com.community.servercore.selection.PortalSelectionService;
 import com.community.servercore.economy.PlayerMarketService;
 import com.community.servercore.economy.WalletService;
+import com.community.servercore.service.ConfigurablePortalResolver;
 import com.community.servercore.service.PortalAccessService;
 import com.community.servercore.service.PortalCooldownService;
+import com.community.servercore.service.PortalResolver;
 import com.community.servercore.service.PortalService;
 import com.community.servercore.service.PortalTeleportService;
 import com.community.servercore.service.PortalValidator;
@@ -109,12 +111,15 @@ public final class ServerCoreRuntime {
         ServerCoreConfig config = ServerCoreBootstrapSupport.ensureConfig(normalizedDirectory);
         JsonPortalRepository portalRepository = new JsonPortalRepository(
                 normalizedDirectory.resolve(config.portalFile()));
+        ConfigurablePortalResolver resolver = new ConfigurablePortalResolver();
+        resolver.registerAll(config.portalRouting());
         PortalService portalService = new PortalService(
                 portalRepository,
                 new PortalValidator(),
                 new PortalCooldownService(clock),
                 accessService,
                 teleportService,
+                resolver,
                 config.allowOverlappingPortals());
         PortalSelectionService selectionService = new PortalSelectionService(clock);
         PortalCommandService portalCommandService = new PortalCommandService(

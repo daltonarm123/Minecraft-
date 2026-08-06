@@ -60,7 +60,7 @@ class JsonConfigLoaderTest {
         loader.loadOrCreate();
 
         ServerCoreConfig changed = new ServerCoreConfig(
-                true, 10, "custom-portals.json", true, 250, false, 5, true, "", 15);
+                true, 10, "custom-portals.json", true, 250, false, 5, true, "", 15, java.util.Map.of());
         loader.save(changed);
 
         assertThat(loader.loadOrCreate()).isEqualTo(changed);
