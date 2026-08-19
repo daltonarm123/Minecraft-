@@ -220,6 +220,10 @@ public final class EconomyCommandService {
         }
     }
 
+    public WalletService wallets() { return wallets; }
+    public CosmeticsService cosmetics() { return cosmetics; }
+    public List<ShopItemDefinition> catalog() { return catalog; }
+
     private static boolean canUse(CommandActor actor) {
         return actor != null
                 && (actor.hasPermission(USE_PERMISSION)
@@ -235,6 +239,6 @@ public final class EconomyCommandService {
     }
 
     private static String formatAmount(long amountMinor) {
-        return amountMinor + " " + LaunchShopCatalog.CURRENCY_SYMBOL;
+        return String.format("%,d", amountMinor) + " " + LaunchShopCatalog.CURRENCY_SYMBOL;
     }
 }

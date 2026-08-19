@@ -4,9 +4,11 @@ import com.community.servercore.ServerCoreRuntime;
 import com.community.servercore.service.PortalUseResult;
 import com.community.servercore.service.PortalUseStatus;
 import com.mojang.logging.LogUtils;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.inventory.MenuType;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.Mod;
@@ -15,6 +17,9 @@ import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 import net.neoforged.neoforge.event.tick.PlayerTickEvent;
+import net.neoforged.neoforge.common.extensions.IMenuTypeExtension;
+import net.neoforged.neoforge.registries.DeferredHolder;
+import net.neoforged.neoforge.registries.DeferredRegister;
 import org.slf4j.Logger;
 
 import java.io.IOException;
@@ -25,10 +30,16 @@ public final class ServerCoreMod {
     public static final String MOD_ID = "servercore";
     private static final Logger LOGGER = LogUtils.getLogger();
 
+    private static final DeferredRegister<MenuType<?>> MENU_TYPES =
+            DeferredRegister.create(Registries.MENU, MOD_ID);
+    public static final DeferredHolder<MenuType<?>, MenuType<NeoForgeShopMenu>> SHOP_MENU =
+            MENU_TYPES.register("shop", () -> IMenuTypeExtension.create(NeoForgeShopMenu::new));
+
     private volatile MinecraftServer server;
     private volatile ServerCoreRuntime runtime;
 
     public ServerCoreMod(IEventBus modEventBus) {
+        MENU_TYPES.register(modEventBus);
         modEventBus.addListener(NeoForgePermissions::onGatherNodes);
         NeoForge.EVENT_BUS.register(this);
         NeoForge.EVENT_BUS.register(new NeoForgeCombatEvents(() -> runtime));

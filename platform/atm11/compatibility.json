@@ -2,7 +2,7 @@
   "pack": "All The Mods 10",
   "packRepository": "AllTheMods/ATM-10",
   "minecraftVersion": "1.21.1",
-  "neoForgeVersion": "21.1.247",
+  "neoForgeVersion": "21.1.248",
   "javaVersion": 21,
   "consoleSupport": {
     "status": "planned",
@@ -12,7 +12,7 @@
   },
   "status": "targeted",
   "notes": [
-    "Targeting the currently installed All The Mods 10 / NeoForge 21.1.247 server profile.",
+    "Targeting the currently installed All The Mods 10 / NeoForge 21.1.248 server profile.",
     "Revalidate before every private-server update.",
     "ServerCore remains platform-independent; the NeoForge adapter is version-specific.",
     "Console support is tracked as a staged rollout and is not public-ready yet."

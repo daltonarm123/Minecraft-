@@ -1,6 +1,7 @@
 package com.community.servercore.neoforge;
 
 import com.community.servercore.command.EconomyCommandService;
+import com.community.servercore.command.PortalCommandService;
 import com.community.servercore.command.RoleCommandService;
 import com.community.servercore.staff.LocalRoleStore;
 import com.community.servercore.staff.StaffRole;
@@ -20,6 +21,7 @@ final class NeoForgePermissions {
 
     static {
         for (StaffRole role : StaffRole.values()) node(role.permission());
+        node(PortalCommandService.ADMIN_PERMISSION); // servercore.admin — portal management
         node(EconomyCommandService.USE_PERMISSION);
         node(EconomyCommandService.ADMIN_PERMISSION);
         node(EconomyCommandService.MODERATION_PERMISSION);

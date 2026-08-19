@@ -57,6 +57,13 @@ final class ServerCoreCommands {
                 (runtime, actor, name) -> runtime.portalCommands().info(actor, name)));
         portal.then(namedPlayerCommand("delete", runtimeSupplier,
                 (runtime, actor, name) -> runtime.portalCommands().delete(actor, name)));
+        portal.then(namedPlayerCommand("remove", runtimeSupplier,
+                (runtime, actor, name) -> runtime.portalCommands().delete(actor, name)));
+        portal.then(Commands.literal("clearall")
+                .executes(context -> executePlayer(
+                        context.getSource(),
+                        runtimeSupplier,
+                        (runtime, actor) -> runtime.portalCommands().clearAll(actor))));
         portal.then(namedPlayerCommand("enable", runtimeSupplier,
                 (runtime, actor, name) -> runtime.portalCommands().setEnabled(actor, name, true)));
         portal.then(namedPlayerCommand("disable", runtimeSupplier,
@@ -182,10 +189,25 @@ final class ServerCoreCommands {
                         (runtime, actor) -> runtime.economyCommands().balance(actor))));
 
         economy.then(Commands.literal("shop")
-                .executes(context -> executePlayer(
-                        context.getSource(),
-                        runtimeSupplier,
-                        (runtime, actor) -> runtime.economyCommands().shop(actor))));
+                .executes(context -> {
+                    try {
+                        ServerPlayer player = context.getSource().getPlayerOrException();
+                        ServerCoreRuntime runtime = runtimeSupplier.get();
+                        if (runtime == null) {
+                            context.getSource().sendFailure(Component.literal("ServerCore has not finished starting."));
+                            return 0;
+                        }
+                        player.openMenu(NeoForgeShopMenu.providerFor(
+                                runtime.economyCommands().catalog(),
+                                runtime.economyCommands().wallets(),
+                                runtime.economyCommands().cosmetics(),
+                                player.getUUID()));
+                        return 1;
+                    } catch (com.mojang.brigadier.exceptions.CommandSyntaxException e) {
+                        context.getSource().sendFailure(Component.literal(e.getMessage()));
+                        return 0;
+                    }
+                }));
 
         economy.then(Commands.literal("shopbuy")
                 .then(Commands.argument("itemId", StringArgumentType.word())

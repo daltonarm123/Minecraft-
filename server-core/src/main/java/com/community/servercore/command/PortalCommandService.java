@@ -189,6 +189,23 @@ public final class PortalCommandService {
         }
     }
 
+    public CommandResult clearAll(CommandActor actor) {
+        if (!authorized(actor)) {
+            return denied();
+        }
+        List<String> names = portalService.list().stream().map(Portal::name).toList();
+        if (names.isEmpty()) {
+            return CommandResult.success("No portals to remove.");
+        }
+        int removed = 0;
+        for (String name : names) {
+            try {
+                if (portalService.delete(name)) removed++;
+            } catch (IOException ignored) {}
+        }
+        return CommandResult.success("Removed " + removed + " portal(s).");
+    }
+
     public CommandResult setEnabled(CommandActor actor, String portalName, boolean enabled) {
         if (!authorized(actor)) {
             return denied();
