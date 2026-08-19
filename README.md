@@ -29,9 +29,9 @@ Revalidate these values before updating the ATM10 server pack. See `platform/atm
 - Server-authoritative cosmetics, wallets, shop catalog, and player market services
 - Automated unit tests that do not require Minecraft
 
-### ATM11 NeoForge adapter
+### NeoForge adapter
 
-- Actual NeoForge mod project for Minecraft 26.1.2
+- NeoForge mod project for Minecraft `1.21.1` / `21.1.247`
 - Server lifecycle bootstrap
 - Player portal-region detection
 - Local world/dimension location teleports
@@ -86,7 +86,7 @@ Initial launch gameplay is focused on Survival and 1v1 portal routing from spawn
 
 ```text
 server-core/          Platform-independent Java domain and services
-servercore-neoforge/  ATM11/NeoForge Minecraft adapter and mod build
+servercore-neoforge/  ATM10 NeoForge Minecraft adapter and mod build
 network-api/          FastAPI service and player portal
 infrastructure/       Docker Compose and deployment notes
 platform/atm11/       Version compatibility target
@@ -101,13 +101,13 @@ gradle clean test build
 
 Output: `server-core/build/libs/`
 
-## Build the ATM11 mod
+## Build the NeoForge mod
 
-Java 25 is required.
+Java `21` is required for the current ATM10 target.
 
 ```bash
 cd servercore-neoforge
-gradle clean build
+./gradlew clean build
 ```
 
 Output: `servercore-neoforge/build/libs/servercore-0.1.0.jar`
@@ -145,10 +145,10 @@ From the repository root you can use:
 - Payment checkout can be configured, but verified payment-provider webhooks and automatic join enforcement are not implemented yet.
 - Only local `LOCATION` portal destinations are connected to Minecraft. Cross-server `SERVER`, `ARENA`, and `EVENT` routing still needs a proxy or dedicated resolver.
 - Ranked duel domain logic exists, but Minecraft combat lifecycle, inventory kits, arena boundaries, death handling, and spectator behavior still need NeoForge event wiring.
-- The ATM11 mod JAR must pass CI and then be tested inside a real private ATM11 server.
+- The ATM10 mod JAR must pass local validation and then be tested inside a private ATM10 server.
 - Console access support is planned but not yet operational; Bedrock bridge setup, identity-link policy, and mixed-protocol validation are still required.
 - Hosting, backups, monitoring, moderation policy, and production secrets are not configured.
 
 ## Development rule
 
-Do not deploy changes directly to a public Minecraft server. Build through CI, install the artifact on a private ATM11 test server, test with designated players, and only then promote a known build to production.
+Do not deploy changes directly to a public Minecraft server. Build through CI or local validation, install the artifact on a private ATM10 test server, test with designated players, and only then promote a known build to production.

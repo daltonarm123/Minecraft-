@@ -2,6 +2,9 @@
 **/__pycache__/
 **/*.py[cod]
 **/*.egg-info/
+network-api/.venv/
+network-api/portal-store.json
+portal-store.json
 
 # Gradle and Java build artifacts
 **/.gradle/
