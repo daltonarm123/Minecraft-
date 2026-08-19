@@ -29,6 +29,7 @@ public final class ServerCoreMod {
     private volatile ServerCoreRuntime runtime;
 
     public ServerCoreMod(IEventBus modEventBus) {
+        modEventBus.addListener(NeoForgePermissions::onGatherNodes);
         NeoForge.EVENT_BUS.register(this);
         NeoForge.EVENT_BUS.register(new NeoForgeCombatEvents(() -> runtime));
         LOGGER.info("ServerCore NeoForge adapter loaded");

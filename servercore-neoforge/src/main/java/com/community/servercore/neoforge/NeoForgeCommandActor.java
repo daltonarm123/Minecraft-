@@ -3,7 +3,6 @@ package com.community.servercore.neoforge;
 import com.community.servercore.command.CommandActor;
 import com.community.servercore.selection.WorldPosition;
 import net.minecraft.commands.CommandSourceStack;
-import net.minecraft.commands.Commands;
 import net.minecraft.server.level.ServerPlayer;
 
 import java.util.Objects;
@@ -39,6 +38,6 @@ final class NeoForgeCommandActor implements CommandActor {
 
     @Override
     public boolean hasPermission(String permission) {
-        return source.hasPermission(Commands.LEVEL_GAMEMASTERS);
+        return NeoForgePermissions.check(player, permission);
     }
 }
