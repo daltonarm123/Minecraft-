@@ -32,6 +32,8 @@ import com.community.servercore.service.PortalTeleportService;
 import com.community.servercore.service.PortalValidator;
 import com.community.servercore.storage.JsonPortalRepository;
 
+import com.community.servercore.staff.LocalRoleStore;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -54,6 +56,7 @@ public final class ServerCoreRuntime {
     private final RoleCommandService roleCommandService;
     private final StaffAreaCommandService staffAreaCommandService;
     private final AuditSink auditSink;
+    private final LocalRoleStore roleStore;
 
     private ServerCoreRuntime(
             ServerCoreConfig config,
@@ -70,7 +73,8 @@ public final class ServerCoreRuntime {
             EconomyCommandService economyCommandService,
             RoleCommandService roleCommandService,
             StaffAreaCommandService staffAreaCommandService,
-            AuditSink auditSink) {
+            AuditSink auditSink,
+            LocalRoleStore roleStore) {
         this.config = Objects.requireNonNull(config, "config");
         this.portalService = Objects.requireNonNull(portalService, "portalService");
         this.portalSelectionService = Objects.requireNonNull(portalSelectionService, "portalSelectionService");
@@ -86,6 +90,7 @@ public final class ServerCoreRuntime {
         this.roleCommandService = Objects.requireNonNull(roleCommandService, "roleCommandService");
         this.staffAreaCommandService = Objects.requireNonNull(staffAreaCommandService, "staffAreaCommandService");
         this.auditSink = Objects.requireNonNull(auditSink, "auditSink");
+        this.roleStore = Objects.requireNonNull(roleStore, "roleStore");
     }
 
     public static ServerCoreRuntime bootstrap(
@@ -154,7 +159,8 @@ public final class ServerCoreRuntime {
             walletService,
             marketService,
             cosmeticsService);
-        RoleCommandService roleCommandService = new RoleCommandService();
+        LocalRoleStore roleStore = new LocalRoleStore(normalizedDirectory.resolve("roles.json"));
+        RoleCommandService roleCommandService = new RoleCommandService(roleStore);
         StaffAreaCommandService staffAreaCommandService = new StaffAreaCommandService(portalCommandService);
 
         auditSink.publish(AuditEvent.system(
@@ -187,7 +193,8 @@ public final class ServerCoreRuntime {
             economyCommandService,
             roleCommandService,
             staffAreaCommandService,
-                auditSink);
+                auditSink,
+            roleStore);
     }
 
     public ServerCoreConfig config() {
@@ -240,6 +247,10 @@ public final class ServerCoreRuntime {
 
     public RoleCommandService roles() {
         return roleCommandService;
+    }
+
+    public LocalRoleStore roleStore() {
+        return roleStore;
     }
 
     public StaffAreaCommandService staffAreas() {

@@ -2,6 +2,7 @@ package com.community.servercore.neoforge;
 
 import com.community.servercore.command.EconomyCommandService;
 import com.community.servercore.command.RoleCommandService;
+import com.community.servercore.staff.LocalRoleStore;
 import com.community.servercore.staff.StaffRole;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.neoforge.server.permission.PermissionAPI;
@@ -13,22 +14,23 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 final class NeoForgePermissions {
-    // All permission nodes keyed by their dotted string so hasPermission() can look them up.
     private static final Map<String, PermissionNode<Boolean>> NODES = new LinkedHashMap<>();
+    // Set once on server start; allows /role give to work without a separate permissions mod
+    private static volatile LocalRoleStore roleStore;
 
     static {
-        // StaffRole nodes — these are the ones FTB Ranks assigns per-player
-        for (StaffRole role : StaffRole.values()) {
-            node(role.permission());
-        }
-        // Economy nodes
+        for (StaffRole role : StaffRole.values()) node(role.permission());
         node(EconomyCommandService.USE_PERMISSION);
         node(EconomyCommandService.ADMIN_PERMISSION);
         node(EconomyCommandService.MODERATION_PERMISSION);
-        // Role view nodes
         node(RoleCommandService.VIEW_PERMISSION);
+        node(RoleCommandService.MANAGE_PERMISSION);
         node(RoleCommandService.DEV_AREA_PERMISSION);
         node(RoleCommandService.ADMIN_AREA_PERMISSION);
+    }
+
+    static void setRoleStore(LocalRoleStore store) {
+        roleStore = store;
     }
 
     static void onGatherNodes(PermissionGatherEvent.Nodes event) {
@@ -36,11 +38,12 @@ final class NeoForgePermissions {
     }
 
     static boolean check(ServerPlayer player, String permission) {
+        // Local store grants (from /role give) take priority
+        LocalRoleStore store = roleStore;
+        if (store != null && store.has(player.getUUID(), permission)) return true;
+        // Fall through to FTB Ranks / other permission mods via NeoForge PermissionAPI
         PermissionNode<Boolean> node = NODES.get(permission);
-        if (node != null) {
-            return Boolean.TRUE.equals(PermissionAPI.getPermission(player, node));
-        }
-        // Unknown node — fall back to op level 2 so the server isn't locked open
+        if (node != null) return Boolean.TRUE.equals(PermissionAPI.getPermission(player, node));
         return player.hasPermissions(2);
     }
 

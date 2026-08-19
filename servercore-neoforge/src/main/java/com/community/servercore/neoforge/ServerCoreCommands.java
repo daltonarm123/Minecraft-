@@ -132,6 +132,44 @@ final class ServerCoreCommands {
                         context.getSource(),
                         runtimeSupplier,
                         (runtime, actor) -> runtime.roles().areaAccess(actor))));
+        roles.then(Commands.literal("give")
+                .then(Commands.argument("player", StringArgumentType.word())
+                        .then(Commands.argument("role", StringArgumentType.word())
+                                .executes(context -> executePlayer(
+                                        context.getSource(),
+                                        runtimeSupplier,
+                                        (runtime, actor) -> {
+                                            String targetName = StringArgumentType.getString(context, "player");
+                                            String roleName = StringArgumentType.getString(context, "role");
+                                            return resolvePlayer(context.getSource(), targetName)
+                                                    .map(target -> {
+                                                        CommandResult result = runtime.roles().grantRole(
+                                                                actor, target.getUUID(), target.getName().getString(), roleName);
+                                                        if (result.successful()) NeoForgePlayerDisplayEvents.refreshPlayerTeam(target);
+                                                        return result;
+                                                    })
+                                                    .orElseGet(() -> CommandResult.failure("Player not found or not online."));
+                                        })))));
+
+        roles.then(Commands.literal("revoke")
+                .then(Commands.argument("player", StringArgumentType.word())
+                        .then(Commands.argument("role", StringArgumentType.word())
+                                .executes(context -> executePlayer(
+                                        context.getSource(),
+                                        runtimeSupplier,
+                                        (runtime, actor) -> {
+                                            String targetName = StringArgumentType.getString(context, "player");
+                                            String roleName = StringArgumentType.getString(context, "role");
+                                            return resolvePlayer(context.getSource(), targetName)
+                                                    .map(target -> {
+                                                        CommandResult result = runtime.roles().revokeRole(
+                                                                actor, target.getUUID(), target.getName().getString(), roleName);
+                                                        if (result.successful()) NeoForgePlayerDisplayEvents.refreshPlayerTeam(target);
+                                                        return result;
+                                                    })
+                                                    .orElseGet(() -> CommandResult.failure("Player not found or not online."));
+                                        })))));
+
         event.getDispatcher().register(roles);
 
         LiteralArgumentBuilder<CommandSourceStack> economy = Commands.literal("economy");

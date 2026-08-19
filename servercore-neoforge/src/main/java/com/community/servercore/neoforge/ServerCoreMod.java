@@ -32,6 +32,7 @@ public final class ServerCoreMod {
         modEventBus.addListener(NeoForgePermissions::onGatherNodes);
         NeoForge.EVENT_BUS.register(this);
         NeoForge.EVENT_BUS.register(new NeoForgeCombatEvents(() -> runtime));
+        NeoForge.EVENT_BUS.register(new NeoForgePlayerDisplayEvents());
         LOGGER.info("ServerCore NeoForge adapter loaded");
     }
 
@@ -43,6 +44,7 @@ public final class ServerCoreMod {
                     Path.of("config", "servercore"),
                     new NeoForgePortalAccessService(() -> server),
                     new NeoForgePortalTeleportService(() -> server));
+            NeoForgePermissions.setRoleStore(runtime.roleStore());
             LOGGER.info(
                     "ServerCore started with {} configured portals",
                     runtime.portals().list().size());
