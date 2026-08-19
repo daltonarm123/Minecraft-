@@ -6,8 +6,8 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
 
-// Registers the vanilla ContainerScreen renderer for the shop menu on the physical client.
-@EventBusSubscriber(modid = ServerCoreMod.MOD_ID, value = Dist.CLIENT)
+// RegisterMenuScreensEvent is a mod lifecycle event — must use Bus.MOD.
+@EventBusSubscriber(modid = ServerCoreMod.MOD_ID, value = Dist.CLIENT, bus = EventBusSubscriber.Bus.MOD)
 final class NeoForgeClientEvents {
     @SubscribeEvent
     @SuppressWarnings({"unchecked", "rawtypes"})
