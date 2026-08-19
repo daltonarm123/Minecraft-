@@ -9,6 +9,7 @@ portal-store.json
 # Gradle and Java build artifacts
 **/.gradle/
 **/build/
+servercore-neoforge/run/
 
 # IDE files
 .vscode/
