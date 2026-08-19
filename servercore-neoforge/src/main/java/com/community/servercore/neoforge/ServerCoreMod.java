@@ -40,7 +40,7 @@ public final class ServerCoreMod {
 
     public ServerCoreMod(IEventBus modEventBus) {
         MENU_TYPES.register(modEventBus);
-        modEventBus.addListener(NeoForgePermissions::onGatherNodes);
+        NeoForge.EVENT_BUS.addListener(NeoForgePermissions::onGatherNodes);
         NeoForge.EVENT_BUS.register(this);
         NeoForge.EVENT_BUS.register(new NeoForgeCombatEvents(() -> runtime));
         NeoForge.EVENT_BUS.register(new NeoForgePlayerDisplayEvents());
