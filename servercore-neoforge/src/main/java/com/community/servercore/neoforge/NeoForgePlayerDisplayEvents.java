@@ -28,16 +28,25 @@ final class NeoForgePlayerDisplayEvents {
     // Called after /role give or /role revoke so the change takes effect immediately.
     static void refreshPlayerTeam(ServerPlayer player) {
         Scoreboard scoreboard = player.server.getScoreboard();
-        // Remove from any existing servercore rank teams first
+        String playerName = player.getScoreboardName();
+
+        // Remove the player only from a ServerCore rank team they are actually on.
+        // Scoreboard#removePlayerFromTeam(player, team) throws if the supplied team
+        // is not the player's current team, so blindly iterating every sc_* team
+        // can prevent the player from joining the world.
         for (StaffRole role : StaffRole.values()) {
             PlayerTeam team = scoreboard.getPlayerTeam(teamName(role));
-            if (team != null) scoreboard.removePlayerFromTeam(player.getScoreboardName(), team);
+            if (team != null && team.getPlayers().contains(playerName)) {
+                scoreboard.removePlayerFromTeam(playerName, team);
+                break;
+            }
         }
+
         // Assign to the highest role the player holds
         for (StaffRole role : StaffRole.values()) {
             if (NeoForgePermissions.check(player, role.permission())) {
                 PlayerTeam team = scoreboard.getPlayerTeam(teamName(role));
-                if (team != null) scoreboard.addPlayerToTeam(player.getScoreboardName(), team);
+                if (team != null) scoreboard.addPlayerToTeam(playerName, team);
                 return;
             }
         }
