@@ -28,7 +28,6 @@ final class NeoForgePortalAccessService implements PortalAccessService {
         }
         ServerPlayer player = server.getPlayerList().getPlayer(playerId);
         return player != null
-                && Commands.hasPermission(Commands.LEVEL_GAMEMASTERS)
-                        .test(player.createCommandSourceStack());
+                && player.createCommandSourceStack().hasPermission(Commands.LEVEL_GAMEMASTERS);
     }
 }

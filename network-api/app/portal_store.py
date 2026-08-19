@@ -4,10 +4,11 @@ import hashlib
 import json
 import os
 import secrets
+import tempfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from threading import RLock
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from .portal_models import (
     DiscordIdentity,
@@ -38,7 +39,16 @@ class PortalStore:
 
     def __init__(self, storage_path: str | Path | None = None) -> None:
         self._lock = RLock()
-        self._path = Path(storage_path or os.getenv("SERVERCORE_PORTAL_STORE_PATH", "portal-store.json"))
+        if storage_path is not None:
+            self._path = Path(storage_path).expanduser()
+        else:
+            configured_path = os.getenv("SERVERCORE_PORTAL_STORE_PATH")
+            if configured_path:
+                self._path = Path(configured_path).expanduser()
+            elif os.getenv("PYTEST_CURRENT_TEST"):
+                self._path = Path(tempfile.gettempdir()) / f"servercore-portal-store-{uuid4().hex}.json"
+            else:
+                self._path = Path("portal-store.json")
         self._path = self._path.expanduser()
         self._path.parent.mkdir(parents=True, exist_ok=True)
         self._oauth_states: dict[str, datetime] = {}

@@ -1,18 +1,18 @@
 # ServerCore Minecraft Server Platform
 
-Custom development foundation for an All The Mods 11 server with modded survival, configurable portals, ranked duels, a player economy, and server-side APIs.
+Custom development foundation for an All The Mods 10 server with modded survival, configurable portals, ranked duels, a player economy, and server-side APIs.
 
 ## Compatibility target
 
 The current adapter is pinned provisionally to:
 
-- All The Mods 11
-- Minecraft `26.1.2`
-- NeoForge `26.1.2.76`
-- Java `25` for the Minecraft adapter
+- All The Mods 10
+- Minecraft `1.21.1`
+- NeoForge `21.1.247`
+- Java `21` for the Minecraft adapter
 - Java `21` for platform-independent core tests
 
-Revalidate these values before updating the ATM11 server pack. See `platform/atm11/compatibility.json`.
+Revalidate these values before updating the ATM10 server pack. See `platform/atm11/compatibility.json`.
 
 ## What is implemented
 

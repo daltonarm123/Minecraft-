@@ -7,7 +7,7 @@ version="${mod_version}"
 displayName="${mod_name}"
 authors="Dalton Armstrong"
 description='''
-Custom portal, hub, duel, statistics, and administration systems for the community All The Mods 11 server.
+Custom portal, hub, duel, statistics, and administration systems for the community All The Mods 10 server.
 '''
 
 [[dependencies.${mod_id}]]

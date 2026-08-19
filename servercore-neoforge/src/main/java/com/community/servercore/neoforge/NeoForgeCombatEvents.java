@@ -29,10 +29,11 @@ final class NeoForgeCombatEvents {
         if (runtime == null) {
             return;
         }
+        String playerName = player.getName().getString();
         runtime.audit().publish(AuditEvent.system(
                 AuditEventType.PLAYER_KILLED,
                 java.time.Clock.systemUTC().instant(),
-                "Combat event captured for " + player.getGameProfile().getName()));
-        LOGGER.debug("Captured combat event for {}", player.getGameProfile().getName());
+                "Combat event captured for " + playerName));
+        LOGGER.debug("Captured combat event for {}", playerName);
     }
 }

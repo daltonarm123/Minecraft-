@@ -30,7 +30,7 @@ final class ServerCoreCommands {
         Objects.requireNonNull(runtimeSupplier, "runtimeSupplier");
 
         event.getDispatcher().register(Commands.literal("servercore")
-                .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
+                .requires(source -> source.hasPermission(Commands.LEVEL_GAMEMASTERS))
                 .then(Commands.literal("status")
                         .executes(context -> status(context.getSource(), runtimeSupplier)))
                 .then(Commands.literal("setup")
@@ -45,7 +45,7 @@ final class ServerCoreCommands {
                                         PortalDestination.location("minecraft:overworld", 200, 70, 200, 0, 0))))));
 
         LiteralArgumentBuilder<CommandSourceStack> portal = Commands.literal("portal");
-        portal.requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS));
+        portal.requires(source -> source.hasPermission(Commands.LEVEL_GAMEMASTERS));
 
         portal.then(namedPlayerCommand("begin", runtimeSupplier,
                 (runtime, actor, name) -> runtime.portalCommands().begin(actor, name)));
@@ -116,7 +116,7 @@ final class ServerCoreCommands {
         event.getDispatcher().register(portal);
 
         LiteralArgumentBuilder<CommandSourceStack> roles = Commands.literal("role");
-        roles.requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS));
+        roles.requires(source -> source.hasPermission(Commands.LEVEL_GAMEMASTERS));
         roles.then(Commands.literal("list")
                 .executes(context -> executePlayer(
                         context.getSource(),
@@ -135,7 +135,7 @@ final class ServerCoreCommands {
         event.getDispatcher().register(roles);
 
         LiteralArgumentBuilder<CommandSourceStack> economy = Commands.literal("economy");
-        economy.requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS));
+        economy.requires(source -> source.hasPermission(Commands.LEVEL_GAMEMASTERS));
 
         economy.then(Commands.literal("balance")
                 .executes(context -> executePlayer(

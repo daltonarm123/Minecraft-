@@ -12,6 +12,7 @@ public enum AuditEventType {
     PORTAL_FAILED,
     PLAYER_JOINED,
     PLAYER_LEFT,
+    PLAYER_KILLED,
     DUEL_QUEUED,
     DUEL_MATCHED,
     DUEL_STARTED,

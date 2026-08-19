@@ -31,7 +31,7 @@ final class NeoForgeCommandActor implements CommandActor {
     @Override
     public WorldPosition position() {
         return new WorldPosition(
-                player.level().dimension().identifier().toString(),
+                player.level().dimension().location().toString(),
                 player.getX(),
                 player.getY(),
                 player.getZ());
@@ -39,6 +39,6 @@ final class NeoForgeCommandActor implements CommandActor {
 
     @Override
     public boolean hasPermission(String permission) {
-        return Commands.hasPermission(Commands.LEVEL_GAMEMASTERS).test(source);
+        return source.hasPermission(Commands.LEVEL_GAMEMASTERS);
     }
 }

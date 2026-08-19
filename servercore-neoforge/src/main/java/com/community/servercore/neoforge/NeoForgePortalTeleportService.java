@@ -5,8 +5,8 @@ import com.community.servercore.portal.PortalDestination;
 import com.community.servercore.service.PortalTeleportService;
 import com.community.servercore.service.TeleportResult;
 import net.minecraft.core.registries.Registries;
-import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -42,7 +42,7 @@ final class NeoForgePortalTeleportService implements PortalTeleportService {
         }
 
         try {
-            Identifier dimensionId = parseDimension(destination.target());
+            ResourceLocation dimensionId = parseDimension(destination.target());
             ResourceKey<Level> dimensionKey = ResourceKey.create(Registries.DIMENSION, dimensionId);
             ServerLevel destinationLevel = server.getLevel(dimensionKey);
             if (destinationLevel == null) {
@@ -54,16 +54,16 @@ final class NeoForgePortalTeleportService implements PortalTeleportService {
             double z = destination.z();
             float yaw = destination.yaw() == null ? player.getYRot() : destination.yaw();
             float pitch = destination.pitch() == null ? player.getXRot() : destination.pitch();
-            player.teleportTo(destinationLevel, x, y, z, Set.of(), yaw, pitch, false);
+            player.teleportTo(destinationLevel, x, y, z, Set.of(), yaw, pitch);
             return TeleportResult.success("Teleported to " + dimensionId + ".");
         } catch (RuntimeException exception) {
             return TeleportResult.failure("Teleport failed: " + exception.getMessage());
         }
     }
 
-    private static Identifier parseDimension(String target) {
+    private static ResourceLocation parseDimension(String target) {
         return target.contains(":")
-                ? Identifier.parse(target)
-                : Identifier.withDefaultNamespace(target);
+                ? ResourceLocation.parse(target)
+                : ResourceLocation.withDefaultNamespace(target);
     }
 }
