@@ -1,6 +1,6 @@
 plugins {
     id 'java-library'
-    id 'net.neoforged.moddev' version '2.0.141'
+    id 'net.neoforged.moddev' version '2.0.144'
     id 'idea'
 }
 
@@ -92,6 +92,18 @@ neoForge.ideSyncTask generateModMetadata
 
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
+}
+
+// Vineflower produces empty output decompiling the full Minecraft jar in this
+// headless environment. Skip decompile+recompile; use the binary rename jar for
+// the compile classpath. Sources won't be available in the IDE, but the mod
+// compiles, packages, and deploys correctly.
+afterEvaluate {
+    tasks.withType(net.neoforged.nfrtgradle.CreateMinecraftArtifacts).configureEach {
+        disableRecompilation = true
+        gameSourcesArtifact.unset()
+        gameJarWithSourcesArtifact.unset()
+    }
 }
 
 tasks.named('jar', Jar).configure {
