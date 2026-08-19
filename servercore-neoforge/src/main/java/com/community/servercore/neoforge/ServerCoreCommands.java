@@ -249,6 +249,10 @@ final class ServerCoreCommands {
 
         economy.then(market);
         event.getDispatcher().register(economy);
+
+        // /eco is a short alias for /economy
+        event.getDispatcher().register(Commands.literal("eco")
+                .redirect(event.getDispatcher().getRoot().getChild("economy")));
     }
 
     private static LiteralArgumentBuilder<CommandSourceStack> namedPlayerCommand(
