@@ -13,8 +13,12 @@ import net.neoforged.neoforge.server.permission.nodes.PermissionTypes;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.UUID;
 
 final class NeoForgePermissions {
+    private static final UUID DEVELOPMENT_PLAYER_UUID =
+            UUID.fromString("ddd126d4-deb9-4e42-9a63-355f0571a966");
+
     private static final Map<String, PermissionNode<Boolean>> NODES = new LinkedHashMap<>();
     // Set once on server start; allows /role give to work without a separate permissions mod
     private static volatile LocalRoleStore roleStore;
@@ -40,9 +44,21 @@ final class NeoForgePermissions {
     }
 
     static boolean check(ServerPlayer player, String permission) {
+        // Private ATM10 development bootstrap: SoaREnvy should display only as Developer,
+        // but can exercise all non-role ServerCore permissions while features are being tested.
+        // This must run before PermissionAPI because the dev account is temporarily OP'd and
+        // the default resolver would otherwise make every staff role (including Owner) true.
+        if (DEVELOPMENT_PLAYER_UUID.equals(player.getUUID()) && permission.startsWith("servercore.")) {
+            if (permission.startsWith("servercore.role.")) {
+                return StaffRole.DEVELOPER.permission().equals(permission);
+            }
+            return true;
+        }
+
         // Local store grants (from /role give) take priority
         LocalRoleStore store = roleStore;
         if (store != null && store.has(player.getUUID(), permission)) return true;
+
         // Fall through to FTB Ranks / other permission mods via NeoForge PermissionAPI
         PermissionNode<Boolean> node = NODES.get(permission);
         if (node != null) return Boolean.TRUE.equals(PermissionAPI.getPermission(player, node));
