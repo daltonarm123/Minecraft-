@@ -9,17 +9,22 @@ import net.minecraft.world.level.Level;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.level.BlockEvent;
 
+import java.util.List;
 import java.util.function.Supplier;
 
-/** Protects the Gaming Castle spawn city from non-staff block breaking. */
+/** Protects Gaming Castle infrastructure from non-staff block breaking. */
 final class NeoForgeCityProtectionEvents {
-    // Realm City footprint centered around the Gaming Castle spawn hub.
-    // Intentionally protects the entire vertical column so players cannot tunnel
-    // underneath the city and damage it from below.
-    private static final int MIN_X = -265;
-    private static final int MAX_X = -25;
-    private static final int MIN_Z = -70;
-    private static final int MAX_Z = 185;
+    private static final List<ProtectedRegion> PROTECTED_REGIONS = List.of(
+            // Main Gaming Castle realm city.
+            new ProtectedRegion(-265, -25, -70, 185),
+            // Market District.
+            new ProtectedRegion(1440, 1560, -60, 60),
+            // Duels Arena.
+            new ProtectedRegion(-1565, -1435, -65, 65),
+            // Staff Lounge.
+            new ProtectedRegion(-52, 52, -1552, -1444),
+            // Survival landing infrastructure only. The rest of Survival stays buildable.
+            new ProtectedRegion(-20, 20, 1468, 1540));
 
     private final Supplier<ServerCoreRuntime> runtimeSupplier;
 
@@ -36,8 +41,7 @@ final class NeoForgeCityProtectionEvents {
             return;
         }
 
-        BlockPos pos = event.getPos();
-        if (!isInsideGamingCastle(pos)) {
+        if (!isProtected(event.getPos())) {
             return;
         }
 
@@ -48,15 +52,17 @@ final class NeoForgeCityProtectionEvents {
 
         event.setCanceled(true);
         player.displayClientMessage(
-                Component.literal("Gaming Castle is protected. Only staff can break blocks here."),
+                Component.literal("Gaming Castle infrastructure is protected. Only staff can break blocks here."),
                 true);
     }
 
-    private static boolean isInsideGamingCastle(BlockPos pos) {
-        return pos.getX() >= MIN_X
-                && pos.getX() <= MAX_X
-                && pos.getZ() >= MIN_Z
-                && pos.getZ() <= MAX_Z;
+    private static boolean isProtected(BlockPos pos) {
+        for (ProtectedRegion region : PROTECTED_REGIONS) {
+            if (region.contains(pos)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static boolean isStaff(ServerCoreRuntime runtime, ServerPlayer player) {
@@ -66,5 +72,14 @@ final class NeoForgeCityProtectionEvents {
             }
         }
         return false;
+    }
+
+    private record ProtectedRegion(int minX, int maxX, int minZ, int maxZ) {
+        private boolean contains(BlockPos pos) {
+            return pos.getX() >= minX
+                    && pos.getX() <= maxX
+                    && pos.getZ() >= minZ
+                    && pos.getZ() <= maxZ;
+        }
     }
 }
