@@ -51,6 +51,7 @@ public final class ServerCoreMod {
         NeoForge.EVENT_BUS.register(this);
         NeoForge.EVENT_BUS.register(new NeoForgeCombatEvents(() -> runtime));
         NeoForge.EVENT_BUS.register(new NeoForgePlayerDisplayEvents());
+        NeoForge.EVENT_BUS.register(new NeoForgeCityProtectionEvents(() -> runtime));
         LOGGER.info("ServerCore NeoForge adapter loaded");
     }
 
