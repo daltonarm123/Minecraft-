@@ -16,6 +16,8 @@ import java.util.Map;
 import java.util.UUID;
 
 final class NeoForgePermissions {
+    static final String STAFF_PERMISSION = "servercore.staff";
+
     private static final UUID DEVELOPMENT_PLAYER_UUID =
             UUID.fromString("ddd126d4-deb9-4e42-9a63-355f0571a966");
 
@@ -25,6 +27,7 @@ final class NeoForgePermissions {
 
     static {
         for (StaffRole role : StaffRole.values()) node(role.permission());
+        node(STAFF_PERMISSION);
         node(PortalCommandService.ADMIN_PERMISSION); // servercore.admin — portal management
         node(EconomyCommandService.USE_PERMISSION);
         node(EconomyCommandService.ADMIN_PERMISSION);
@@ -55,9 +58,15 @@ final class NeoForgePermissions {
             return true;
         }
 
-        // Local store grants (from /role give) take priority
         LocalRoleStore store = roleStore;
-        if (store != null && store.has(player.getUUID(), permission)) return true;
+        if (store != null) {
+            if (STAFF_PERMISSION.equals(permission) && !store.rolesFor(player.getUUID()).isEmpty()) {
+                return true;
+            }
+            if (store.has(player.getUUID(), permission)) {
+                return true;
+            }
+        }
 
         // Fall through to FTB Ranks / other permission mods via NeoForge PermissionAPI
         PermissionNode<Boolean> node = NODES.get(permission);
