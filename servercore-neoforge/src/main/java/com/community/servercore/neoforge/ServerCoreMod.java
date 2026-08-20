@@ -64,6 +64,7 @@ public final class ServerCoreMod {
                     new NeoForgePortalAccessService(() -> server),
                     new NeoForgePortalTeleportService(() -> server));
             NeoForgePermissions.setRoleStore(runtime.roleStore());
+            GamingCastlePortalBootstrap.ensure(runtime);
             LOGGER.info(
                     "ServerCore started with {} configured portals",
                     runtime.portals().list().size());
