@@ -64,7 +64,11 @@ public final class ServerCoreMod {
                     new NeoForgePortalAccessService(() -> server),
                     new NeoForgePortalTeleportService(() -> server));
             NeoForgePermissions.setRoleStore(runtime.roleStore());
-            GamingCastlePortalBootstrap.ensure(runtime);
+            try {
+                GamingCastlePortalBootstrap.ensure(runtime);
+            } catch (IOException exception) {
+                LOGGER.error("Unable to configure the managed Gaming Castle portal network", exception);
+            }
             LOGGER.info(
                     "ServerCore started with {} configured portals",
                     runtime.portals().list().size());
