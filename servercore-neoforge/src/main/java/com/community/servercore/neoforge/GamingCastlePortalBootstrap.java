@@ -26,6 +26,7 @@ final class GamingCastlePortalBootstrap {
                 "Gaming Castle Market",
                 new PortalRegion(-226, 66, 4, -210, 71, 10),
                 PortalDestination.location(OVERWORLD, 1500, 72, 30, 180.0F, 0.0F),
+                "Market District: use /shop for the server shop and /market for player auctions.",
                 "");
         upsert(
                 runtime,
@@ -33,6 +34,7 @@ final class GamingCastlePortalBootstrap {
                 "Gaming Castle Staff Lounge",
                 new PortalRegion(-86, 66, 4, -70, 71, 10),
                 PortalDestination.location(OVERWORLD, 0, 72, -1480, 180.0F, 0.0F),
+                "Staff Lounge: moderation tools, staff meetings, and the private return gate are inside.",
                 "servercore.staff");
         upsert(
                 runtime,
@@ -40,6 +42,7 @@ final class GamingCastlePortalBootstrap {
                 "Gaming Castle Survival",
                 new PortalRegion(-226, 66, 92, -210, 71, 100),
                 PortalDestination.location(OVERWORLD, 0, 72, 1500, 180.0F, 0.0F),
+                "Survival: build freely beyond the protected landing area. Use ATM10/FTB claims to protect your base.",
                 "");
         upsert(
                 runtime,
@@ -47,6 +50,7 @@ final class GamingCastlePortalBootstrap {
                 "Gaming Castle Duels",
                 new PortalRegion(-86, 66, 92, -70, 71, 100),
                 PortalDestination.location(OVERWORLD, -1500, 72, 30, 180.0F, 0.0F),
+                "Duels District: use /duel join casual or /duel join ranked to queue for the arena.",
                 "");
 
         // Destination -> hub return portals.
@@ -58,6 +62,7 @@ final class GamingCastlePortalBootstrap {
                 "Return to Gaming Castle",
                 new PortalRegion(1493, 71, 38, 1507, 75, 45),
                 hubReturn,
+                "Returning to the Gaming Castle Realm Nexus...",
                 "");
         upsert(
                 runtime,
@@ -65,6 +70,7 @@ final class GamingCastlePortalBootstrap {
                 "Return to Gaming Castle",
                 new PortalRegion(-1507, 71, 38, -1493, 75, 45),
                 hubReturn,
+                "Returning to the Gaming Castle Realm Nexus...",
                 "");
         upsert(
                 runtime,
@@ -72,6 +78,7 @@ final class GamingCastlePortalBootstrap {
                 "Return to Gaming Castle",
                 new PortalRegion(-7, 71, -1462, 7, 75, -1458),
                 hubReturn,
+                "Returning to the Gaming Castle Realm Nexus...",
                 "");
         upsert(
                 runtime,
@@ -79,6 +86,7 @@ final class GamingCastlePortalBootstrap {
                 "Return to Gaming Castle",
                 new PortalRegion(-7, 71, 1520, 7, 75, 1524),
                 hubReturn,
+                "Returning to the Gaming Castle Realm Nexus...",
                 "");
     }
 
@@ -88,6 +96,7 @@ final class GamingCastlePortalBootstrap {
             String displayName,
             PortalRegion region,
             PortalDestination destination,
+            String entryMessage,
             String permission) throws IOException {
         UUID id = runtime.portals().findByName(name)
                 .map(Portal::id)
@@ -102,7 +111,7 @@ final class GamingCastlePortalBootstrap {
                 true,
                 permission,
                 COOLDOWN_SECONDS,
-                "Entering " + displayName + "...",
+                entryMessage,
                 "You do not have access to this destination.",
                 Map.of("managedBy", "gaming_castle"));
         PortalMutationResult result = runtime.portals().save(portal);
