@@ -1,17 +1,25 @@
 package com.community.servercore.command;
 
 import com.community.servercore.selection.WorldPosition;
+import com.community.servercore.staff.LocalRoleStore;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
+import java.io.IOException;
+import java.nio.file.Path;
 import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class RoleCommandServiceTest {
+    @TempDir
+    Path tempDir;
+
     @Test
-    void resolvesAreaAccessFromRolePermissions() {
-        RoleCommandService service = new RoleCommandService();
+    void resolvesAreaAccessFromRolePermissions() throws IOException {
+        RoleCommandService service = new RoleCommandService(
+                new LocalRoleStore(tempDir.resolve("roles.json")));
         TestActor developer = new TestActor(Set.of("servercore.role.dev"));
         TestActor support = new TestActor(Set.of("servercore.role.support"));
 
