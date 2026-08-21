@@ -9,7 +9,6 @@ import com.community.servercore.command.EconomyCommandService;
 import com.community.servercore.command.PortalCommandService;
 import com.community.servercore.command.RoleCommandService;
 import com.community.servercore.command.StaffAreaCommandService;
-import com.community.servercore.config.JsonConfigLoader;
 import com.community.servercore.config.ServerCoreBootstrapSupport;
 import com.community.servercore.config.ServerCoreConfig;
 import com.community.servercore.cosmetic.CosmeticsService;
@@ -18,7 +17,7 @@ import com.community.servercore.cosmetic.JsonCosmeticRepository;
 import com.community.servercore.duel.ArenaRegistry;
 import com.community.servercore.duel.MatchmakingService;
 import com.community.servercore.duel.RatingService;
-import com.community.servercore.player.InMemoryPlayerProfileRepository;
+import com.community.servercore.player.JsonPlayerProfileRepository;
 import com.community.servercore.player.PlayerStatsService;
 import com.community.servercore.selection.PortalSelectionService;
 import com.community.servercore.economy.PlayerMarketService;
@@ -26,13 +25,11 @@ import com.community.servercore.economy.WalletService;
 import com.community.servercore.service.ConfigurablePortalResolver;
 import com.community.servercore.service.PortalAccessService;
 import com.community.servercore.service.PortalCooldownService;
-import com.community.servercore.service.PortalResolver;
 import com.community.servercore.service.PortalService;
 import com.community.servercore.service.PortalTeleportService;
 import com.community.servercore.service.PortalValidator;
-import com.community.servercore.storage.JsonPortalRepository;
-
 import com.community.servercore.staff.LocalRoleStore;
+import com.community.servercore.storage.JsonPortalRepository;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -133,7 +130,7 @@ public final class ServerCoreRuntime {
                 config.maximumPortals(),
                 config.defaultCooldownSeconds());
         PlayerStatsService playerStatsService = new PlayerStatsService(
-                new InMemoryPlayerProfileRepository(),
+                new JsonPlayerProfileRepository(normalizedDirectory.resolve("players.json")),
                 clock);
         ArenaRegistry arenaRegistry = new ArenaRegistry();
         MatchmakingService matchmakingService = new MatchmakingService(
@@ -149,16 +146,16 @@ public final class ServerCoreRuntime {
         CosmeticCommandService cosmeticCommandService = new CosmeticCommandService(
                 cosmeticsService,
                 auditSink);
-        WalletService walletService = new WalletService(clock);
+        WalletService walletService = new WalletService(normalizedDirectory.resolve("wallets.json"), clock);
         PlayerMarketService marketService = new PlayerMarketService(
-            walletService,
-            25,
-            500,
-            clock);
+                walletService,
+                25,
+                500,
+                clock);
         EconomyCommandService economyCommandService = new EconomyCommandService(
-            walletService,
-            marketService,
-            cosmeticsService);
+                walletService,
+                marketService,
+                cosmeticsService);
         LocalRoleStore roleStore = new LocalRoleStore(normalizedDirectory.resolve("roles.json"));
         RoleCommandService roleCommandService = new RoleCommandService(roleStore);
         StaffAreaCommandService staffAreaCommandService = new StaffAreaCommandService(portalCommandService);
@@ -174,9 +171,9 @@ public final class ServerCoreRuntime {
                     "Seeded " + seededCosmetics + " default cosmetic definitions"));
         }
         auditSink.publish(AuditEvent.system(
-            AuditEventType.ADMIN_COMMAND,
-            clock.instant(),
-            "Initialized launch economy defaults (listingFee=25 SC, tax=5%)"));
+                AuditEventType.ADMIN_COMMAND,
+                clock.instant(),
+                "Initialized persistent launch economy (listingFee=25 SC, tax=5%)"));
 
         return new ServerCoreRuntime(
                 config,
@@ -188,76 +185,29 @@ public final class ServerCoreRuntime {
                 matchmakingService,
                 cosmeticsService,
                 cosmeticCommandService,
-            walletService,
-            marketService,
-            economyCommandService,
-            roleCommandService,
-            staffAreaCommandService,
+                walletService,
+                marketService,
+                economyCommandService,
+                roleCommandService,
+                staffAreaCommandService,
                 auditSink,
-            roleStore);
+                roleStore);
     }
 
-    public ServerCoreConfig config() {
-        return config;
-    }
-
-    public PortalService portals() {
-        return portalService;
-    }
-
-    public PortalSelectionService portalSelections() {
-        return portalSelectionService;
-    }
-
-    public PortalCommandService portalCommands() {
-        return portalCommandService;
-    }
-
-    public PlayerStatsService playerStats() {
-        return playerStatsService;
-    }
-
-    public ArenaRegistry arenas() {
-        return arenaRegistry;
-    }
-
-    public MatchmakingService matchmaking() {
-        return matchmakingService;
-    }
-
-    public CosmeticsService cosmetics() {
-        return cosmeticsService;
-    }
-
-    public CosmeticCommandService cosmeticCommands() {
-        return cosmeticCommandService;
-    }
-
-    public WalletService wallets() {
-        return walletService;
-    }
-
-    public PlayerMarketService market() {
-        return marketService;
-    }
-
-    public EconomyCommandService economyCommands() {
-        return economyCommandService;
-    }
-
-    public RoleCommandService roles() {
-        return roleCommandService;
-    }
-
-    public LocalRoleStore roleStore() {
-        return roleStore;
-    }
-
-    public StaffAreaCommandService staffAreas() {
-        return staffAreaCommandService;
-    }
-
-    public AuditSink audit() {
-        return auditSink;
-    }
+    public ServerCoreConfig config() { return config; }
+    public PortalService portals() { return portalService; }
+    public PortalSelectionService portalSelections() { return portalSelectionService; }
+    public PortalCommandService portalCommands() { return portalCommandService; }
+    public PlayerStatsService playerStats() { return playerStatsService; }
+    public ArenaRegistry arenas() { return arenaRegistry; }
+    public MatchmakingService matchmaking() { return matchmakingService; }
+    public CosmeticsService cosmetics() { return cosmeticsService; }
+    public CosmeticCommandService cosmeticCommands() { return cosmeticCommandService; }
+    public WalletService wallets() { return walletService; }
+    public PlayerMarketService market() { return marketService; }
+    public EconomyCommandService economyCommands() { return economyCommandService; }
+    public RoleCommandService roles() { return roleCommandService; }
+    public LocalRoleStore roleStore() { return roleStore; }
+    public StaffAreaCommandService staffAreas() { return staffAreaCommandService; }
+    public AuditSink audit() { return auditSink; }
 }
