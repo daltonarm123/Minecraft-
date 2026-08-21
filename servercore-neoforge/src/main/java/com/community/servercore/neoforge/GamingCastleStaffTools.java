@@ -307,15 +307,11 @@ final class GamingCastleStaffTools {
                 data.addNote(target.getUUID(), "BAN " + Instant.now() + ": " + clean(reason));
             }
         }
-        int result = source.getServer().getCommands().performPrefixedCommand(
+        source.getServer().getCommands().performPrefixedCommand(
                 source.withPermission(Commands.LEVEL_OWNERS),
                 "ban " + targetName + " " + clean(reason));
-        if (result > 0) {
-            source.sendSuccess(() -> Component.literal("Banned " + targetName + "."), false);
-        } else {
-            source.sendFailure(Component.literal("Ban command failed. Check the player name or server ban configuration."));
-        }
-        return result;
+        source.sendSuccess(() -> Component.literal("Ban command issued for " + targetName + "."), false);
+        return 1;
     }
 
     private int vanish(CommandSourceStack source)
