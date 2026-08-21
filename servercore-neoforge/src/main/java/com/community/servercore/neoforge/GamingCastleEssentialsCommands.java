@@ -57,6 +57,7 @@ final class GamingCastleEssentialsCommands {
         dispatcher.register(Commands.literal("home")
                 .executes(context -> {
                     ServerPlayer player = context.getSource().getPlayerOrException();
+                    if (!allowTeleport(context.getSource(), player)) return 0;
                     GamingCastleDataStore store = requireStore(context.getSource(), dataSupplier);
                     if (store == null) return 0;
                     Optional<GamingCastleDataStore.SavedLocation> home = store.home(player.getUUID());
@@ -76,6 +77,7 @@ final class GamingCastleEssentialsCommands {
         dispatcher.register(Commands.literal("back")
                 .executes(context -> {
                     ServerPlayer player = context.getSource().getPlayerOrException();
+                    if (!allowTeleport(context.getSource(), player)) return 0;
                     GamingCastleDataStore.SavedLocation destination = BACKS.get(player.getUUID());
                     if (destination == null) {
                         context.getSource().sendFailure(Component.literal("There is no previous location to return to."));
@@ -129,6 +131,7 @@ final class GamingCastleEssentialsCommands {
 
     private static int teleportHub(CommandSourceStack source) throws com.mojang.brigadier.exceptions.CommandSyntaxException {
         ServerPlayer player = source.getPlayerOrException();
+        if (!allowTeleport(source, player)) return 0;
         BACKS.put(player.getUUID(), GamingCastleTeleports.capture(player));
         if (!GamingCastleTeleports.teleport(source.getServer(), player, GamingCastleTeleports.HUB)) {
             source.sendFailure(Component.literal("Gaming Castle hub is not available."));
@@ -141,9 +144,14 @@ final class GamingCastleEssentialsCommands {
     private static int requestTeleport(CommandSourceStack source, String targetName)
             throws com.mojang.brigadier.exceptions.CommandSyntaxException {
         ServerPlayer requester = source.getPlayerOrException();
+        if (!allowTeleport(source, requester)) return 0;
         ServerPlayer target = source.getServer().getPlayerList().getPlayerByName(targetName);
         if (target == null) {
             source.sendFailure(Component.literal("Player not found or not online."));
+            return 0;
+        }
+        if (GamingCastleCombatTracker.teleportBlocked(target)) {
+            source.sendFailure(Component.literal("That player cannot receive teleport requests while in combat or a duel."));
             return 0;
         }
         if (target.getUUID().equals(requester.getUUID())) {
@@ -163,6 +171,7 @@ final class GamingCastleEssentialsCommands {
     private static int acceptTeleport(CommandSourceStack source)
             throws com.mojang.brigadier.exceptions.CommandSyntaxException {
         ServerPlayer target = source.getPlayerOrException();
+        if (!allowTeleport(source, target)) return 0;
         TpaRequest request = TPA_REQUESTS.remove(target.getUUID());
         if (request == null || request.expiresAtMillis() < System.currentTimeMillis()) {
             source.sendFailure(Component.literal("You do not have an active teleport request."));
@@ -171,6 +180,11 @@ final class GamingCastleEssentialsCommands {
         ServerPlayer requester = source.getServer().getPlayerList().getPlayer(request.requesterId());
         if (requester == null) {
             source.sendFailure(Component.literal("The requesting player is no longer online."));
+            return 0;
+        }
+        if (!allowTeleport(source, requester)) {
+            requester.sendSystemMessage(Component.literal(GamingCastleCombatTracker.blockReason(requester))
+                    .withStyle(ChatFormatting.RED));
             return 0;
         }
         BACKS.put(requester.getUUID(), GamingCastleTeleports.capture(requester));
@@ -293,6 +307,12 @@ final class GamingCastleEssentialsCommands {
         source.sendSuccess(() -> Component.literal("Community: /rules /discord /stats /leaderboard /report <player> <reason>"), false);
         source.sendSuccess(() -> Component.literal("Duels: /duel join casual|ranked /duel leave /duel stats /duel spectate"), false);
         return 1;
+    }
+
+    private static boolean allowTeleport(CommandSourceStack source, ServerPlayer player) {
+        if (!GamingCastleCombatTracker.teleportBlocked(player)) return true;
+        source.sendFailure(Component.literal(GamingCastleCombatTracker.blockReason(player)));
+        return false;
     }
 
     private static GamingCastleDataStore requireStore(
