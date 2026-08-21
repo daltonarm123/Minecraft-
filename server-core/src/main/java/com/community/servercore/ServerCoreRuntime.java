@@ -17,11 +17,11 @@ import com.community.servercore.cosmetic.JsonCosmeticRepository;
 import com.community.servercore.duel.ArenaRegistry;
 import com.community.servercore.duel.MatchmakingService;
 import com.community.servercore.duel.RatingService;
+import com.community.servercore.economy.PlayerMarketService;
+import com.community.servercore.economy.WalletService;
 import com.community.servercore.player.JsonPlayerProfileRepository;
 import com.community.servercore.player.PlayerStatsService;
 import com.community.servercore.selection.PortalSelectionService;
-import com.community.servercore.economy.PlayerMarketService;
-import com.community.servercore.economy.WalletService;
 import com.community.servercore.service.ConfigurablePortalResolver;
 import com.community.servercore.service.PortalAccessService;
 import com.community.servercore.service.PortalCooldownService;
@@ -151,7 +151,8 @@ public final class ServerCoreRuntime {
                 walletService,
                 25,
                 500,
-                clock);
+                clock,
+                normalizedDirectory.resolve("market-listings.json"));
         EconomyCommandService economyCommandService = new EconomyCommandService(
                 walletService,
                 marketService,
