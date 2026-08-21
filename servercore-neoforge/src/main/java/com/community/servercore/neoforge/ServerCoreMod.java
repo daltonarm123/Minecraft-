@@ -45,8 +45,13 @@ public final class ServerCoreMod {
     private volatile MinecraftServer server;
     private volatile ServerCoreRuntime runtime;
     private volatile GamingCastleDataStore communityData;
+    private final GamingCastleStaffTools staffTools;
+    private final GamingCastleDuels duels;
 
     public ServerCoreMod(IEventBus modEventBus) {
+        this.staffTools = new GamingCastleStaffTools(() -> communityData);
+        this.duels = new GamingCastleDuels(() -> runtime);
+
         MENU_TYPES.register(modEventBus);
         NeoForge.EVENT_BUS.addListener(NeoForgePermissions::onGatherNodes);
         NeoForge.EVENT_BUS.register(this);
@@ -54,6 +59,8 @@ public final class ServerCoreMod {
         NeoForge.EVENT_BUS.register(new NeoForgePlayerDisplayEvents());
         NeoForge.EVENT_BUS.register(new NeoForgeCityProtectionEvents(() -> runtime));
         NeoForge.EVENT_BUS.register(new GamingCastlePlayerEvents(() -> runtime, () -> communityData));
+        NeoForge.EVENT_BUS.register(staffTools);
+        NeoForge.EVENT_BUS.register(duels);
         LOGGER.info("ServerCore NeoForge adapter loaded");
     }
 
@@ -80,9 +87,12 @@ public final class ServerCoreMod {
                 LOGGER.error("Unable to configure the managed Gaming Castle portal network", exception);
             }
 
+            GamingCastleDuelBootstrap.ensure(runtime);
+
             LOGGER.info(
-                    "ServerCore started with {} configured portals",
-                    runtime.portals().list().size());
+                    "ServerCore started with {} configured portals and {} duel arena(s)",
+                    runtime.portals().list().size(),
+                    runtime.arenas().list().size());
         } catch (IOException exception) {
             LOGGER.error("ServerCore failed to start", exception);
             runtime = null;
@@ -94,6 +104,8 @@ public final class ServerCoreMod {
     public void onRegisterCommands(RegisterCommandsEvent event) {
         ServerCoreCommands.register(event, () -> runtime);
         GamingCastleEssentialsCommands.register(event, () -> runtime, () -> communityData);
+        staffTools.registerCommands(event);
+        duels.registerCommands(event);
         AccountLinkCommands.register(event);
     }
 
@@ -116,7 +128,6 @@ public final class ServerCoreMod {
             LOGGER.error("Failed to grant Developer role to {}", player.getName().getString(), exception);
         }
 
-        // Temporary bootstrap while legacy admin command roots still use vanilla permission gates.
         if (!currentServer.getPlayerList().isOp(player.getGameProfile())) {
             currentServer.getPlayerList().op(player.getGameProfile());
             currentServer.getPlayerList().sendPlayerPermissionLevel(player);
