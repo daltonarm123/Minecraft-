@@ -45,6 +45,7 @@ public final class ServerCoreMod {
     private volatile MinecraftServer server;
     private volatile ServerCoreRuntime runtime;
     private volatile GamingCastleDataStore communityData;
+    private volatile GamingCastleAuctionHouse auctionHouse;
     private final GamingCastleStaffTools staffTools;
     private final GamingCastleDuels duels;
 
@@ -82,6 +83,13 @@ public final class ServerCoreMod {
             }
 
             try {
+                auctionHouse = new GamingCastleAuctionHouse(DATA_DIRECTORY.resolve("auction-house.json"));
+            } catch (IOException exception) {
+                auctionHouse = null;
+                LOGGER.error("Unable to load Gaming Castle auction house", exception);
+            }
+
+            try {
                 GamingCastlePortalBootstrap.ensure(runtime);
             } catch (IOException exception) {
                 LOGGER.error("Unable to configure the managed Gaming Castle portal network", exception);
@@ -97,6 +105,7 @@ public final class ServerCoreMod {
             LOGGER.error("ServerCore failed to start", exception);
             runtime = null;
             communityData = null;
+            auctionHouse = null;
         }
     }
 
@@ -104,6 +113,7 @@ public final class ServerCoreMod {
     public void onRegisterCommands(RegisterCommandsEvent event) {
         ServerCoreCommands.register(event, () -> runtime);
         GamingCastleEssentialsCommands.register(event, () -> runtime, () -> communityData);
+        GamingCastleAuctionHouse.register(event, () -> runtime, () -> auctionHouse);
         staffTools.registerCommands(event);
         duels.registerCommands(event);
         AccountLinkCommands.register(event);
@@ -164,6 +174,7 @@ public final class ServerCoreMod {
     @SubscribeEvent
     public void onServerStopping(ServerStoppingEvent event) {
         LOGGER.info("ServerCore stopping");
+        auctionHouse = null;
         communityData = null;
         runtime = null;
         server = null;
