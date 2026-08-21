@@ -28,7 +28,7 @@ final class GamingCastlePlayerEvents {
             "Ready to fight? /duel join casual or /duel join ranked. Use /leaderboard for rankings.",
             "Need help with another player? Use /report <player> <reason> and online staff will be notified.",
             "Use /sethome, /home, /tpa, and /hub to make ATM10 travel easier.",
-            "Check /event for Gaming Castle community events and weekend bonuses.");
+            "Check /event for Gaming Castle community events and staff announcements.");
 
     private static long nextTipAtMillis = System.currentTimeMillis() + TIP_INTERVAL_MILLIS;
     private static int tipIndex;
@@ -80,11 +80,6 @@ final class GamingCastlePlayerEvents {
         } else {
             player.sendSystemMessage(Component.literal("Welcome back to Gaming Castle. Use /hub anytime.")
                     .withStyle(ChatFormatting.LIGHT_PURPLE));
-        }
-        if (GamingCastleEvents.weekendBonusActive()) {
-            player.sendSystemMessage(Component.literal(
-                            "Weekend Arena Rush is active! Duel win SC rewards are doubled this weekend.")
-                    .withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD));
         }
     }
 
