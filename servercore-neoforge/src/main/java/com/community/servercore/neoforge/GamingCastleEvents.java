@@ -51,27 +51,23 @@ final class GamingCastleEvents {
         event.getDispatcher().register(root);
     }
 
-    static int duelRewardMultiplier() {
+    private static boolean weekendArenaRush() {
         DayOfWeek day = LocalDate.now(ZoneOffset.UTC).getDayOfWeek();
-        return day == DayOfWeek.SATURDAY || day == DayOfWeek.SUNDAY ? 2 : 1;
-    }
-
-    static boolean weekendBonusActive() {
-        return duelRewardMultiplier() > 1;
+        return day == DayOfWeek.SATURDAY || day == DayOfWeek.SUNDAY;
     }
 
     private static int status(CommandSourceStack source) {
-        if (weekendBonusActive()) {
+        if (weekendArenaRush()) {
             source.sendSuccess(() -> Component.literal(
-                            "Weekend Arena Rush is ACTIVE: Gaming Castle duel win rewards are doubled!")
+                            "Weekend Arena Rush is on the calendar today. Use /duel join casual or /duel join ranked and watch for staff event announcements.")
                     .withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD), false);
         } else {
             source.sendSuccess(() -> Component.literal(
-                            "Next recurring event: Weekend Arena Rush - double duel win SC every Saturday and Sunday (UTC).")
+                            "Recurring community focus: Weekend Arena Rush every Saturday and Sunday (UTC).")
                     .withStyle(ChatFormatting.AQUA), false);
         }
         source.sendSuccess(() -> Component.literal(
-                "Staff can also launch community Duel Night, Build, and Market events at any time."), false);
+                "Staff can launch Duel Night, Build, Market, or custom announcements with /event."), false);
         return 1;
     }
 
