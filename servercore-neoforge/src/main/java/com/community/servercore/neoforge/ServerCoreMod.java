@@ -86,9 +86,10 @@ public final class ServerCoreMod {
 
             try {
                 auctionHouse = new GamingCastleAuctionHouse(DATA_DIRECTORY.resolve("auction-house.json"));
-            } catch (IOException exception) {
+                auctionHouse.recover(runtime);
+            } catch (IOException | RuntimeException exception) {
                 auctionHouse = null;
-                LOGGER.error("Unable to load Gaming Castle auction house", exception);
+                LOGGER.error("Unable to load or recover Gaming Castle auction house", exception);
             }
 
             try {
