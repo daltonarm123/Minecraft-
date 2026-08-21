@@ -1,5 +1,19 @@
 package com.community.servercore.economy;
 
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.JsonDeserializer;
+import com.google.gson.JsonSerializer;
+import com.google.gson.reflect.TypeToken;
+
+import java.io.IOException;
+import java.io.Reader;
+import java.io.Writer;
+import java.lang.reflect.Type;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -14,6 +28,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantLock;
 
 public final class PlayerMarketService {
+    private static final Type LISTING_LIST_TYPE = new TypeToken<List<MarketListing>>() { }.getType();
+
     public static final UUID TREASURY_ACCOUNT_ID = UUID.nameUUIDFromBytes("servercore-treasury".getBytes());
 
     private final WalletService wallets;
@@ -22,12 +38,36 @@ public final class PlayerMarketService {
     private final int salesTaxBasisPoints;
     private final Map<UUID, MarketListing> listings = new ConcurrentHashMap<>();
     private final ReentrantLock lock = new ReentrantLock();
+    private final Path persistenceFile;
+    private final Path backupFile;
+    private final Gson gson;
 
+    /** In-memory constructor retained for tests. */
     public PlayerMarketService(
             WalletService wallets,
             long listingFeeMinor,
             int salesTaxBasisPoints,
             Clock clock) {
+        this(wallets, listingFeeMinor, salesTaxBasisPoints, clock, null, false);
+    }
+
+    /** Production constructor with durable JSON listing persistence. */
+    public PlayerMarketService(
+            WalletService wallets,
+            long listingFeeMinor,
+            int salesTaxBasisPoints,
+            Clock clock,
+            Path persistenceFile) throws IOException {
+        this(wallets, listingFeeMinor, salesTaxBasisPoints, clock, persistenceFile, true);
+    }
+
+    private PlayerMarketService(
+            WalletService wallets,
+            long listingFeeMinor,
+            int salesTaxBasisPoints,
+            Clock clock,
+            Path persistenceFile,
+            boolean loadPersistence) {
         this.wallets = Objects.requireNonNull(wallets, "wallets");
         this.clock = Objects.requireNonNull(clock, "clock");
         if (listingFeeMinor < 0) {
@@ -38,6 +78,24 @@ public final class PlayerMarketService {
         }
         this.listingFeeMinor = listingFeeMinor;
         this.salesTaxBasisPoints = salesTaxBasisPoints;
+        this.persistenceFile = persistenceFile == null ? null : persistenceFile.toAbsolutePath().normalize();
+        this.backupFile = this.persistenceFile == null
+                ? null
+                : this.persistenceFile.resolveSibling(this.persistenceFile.getFileName() + ".bak");
+        this.gson = new GsonBuilder()
+                .registerTypeAdapter(Instant.class,
+                        (JsonSerializer<Instant>) (src, type, context) -> context.serialize(src.toString()))
+                .registerTypeAdapter(Instant.class,
+                        (JsonDeserializer<Instant>) (json, type, context) -> Instant.parse(json.getAsString()))
+                .setPrettyPrinting()
+                .create();
+        if (loadPersistence) {
+            try {
+                load();
+            } catch (IOException exception) {
+                throw new IllegalStateException("Unable to load player market listings", exception);
+            }
+        }
     }
 
     public MarketListing createListing(
@@ -77,6 +135,7 @@ public final class PlayerMarketService {
                 now.plus(duration),
                 MarketListingStatus.ACTIVE);
         listings.put(listing.listingId(), listing);
+        persistUnchecked();
         return listing;
     }
 
@@ -99,6 +158,7 @@ public final class PlayerMarketService {
             }
             MarketListing cancelled = listing.withQuantityAndStatus(listing.quantity(), MarketListingStatus.CANCELLED);
             listings.put(listingId, cancelled);
+            persistUnchecked();
             return Optional.of(cancelled);
         } finally {
             lock.unlock();
@@ -113,6 +173,7 @@ public final class PlayerMarketService {
         if (limit < 1 || limit > 1000) {
             throw new IllegalArgumentException("limit must be between 1 and 1000");
         }
+        expireOldListings();
         Instant now = clock.instant();
         List<MarketListing> active = new ArrayList<>();
         for (MarketListing listing : listings.values()) {
@@ -147,6 +208,7 @@ public final class PlayerMarketService {
                         listing.quantity(),
                         MarketListingStatus.EXPIRED);
                 listings.put(listing.listingId(), expired);
+                persistUnchecked();
                 throw new IllegalStateException("Listing has expired");
             }
             if (listing.status() != MarketListingStatus.ACTIVE
@@ -157,7 +219,7 @@ public final class PlayerMarketService {
                 throw new IllegalStateException("Requested quantity exceeds available stock");
             }
 
-            long gross = listing.unitPriceMinor() * quantity;
+            long gross = Math.multiplyExact(listing.unitPriceMinor(), quantity);
             long tax = (gross * salesTaxBasisPoints) / 10_000L;
             long sellerNet = gross - tax;
 
@@ -189,9 +251,90 @@ public final class PlayerMarketService {
                     : MarketListingStatus.PARTIALLY_FILLED;
             MarketListing updated = listing.withQuantityAndStatus(remaining, status);
             listings.put(listingId, updated);
+            persistUnchecked();
             return updated;
         } finally {
             lock.unlock();
+        }
+    }
+
+    private void expireOldListings() {
+        boolean changed = false;
+        Instant now = clock.instant();
+        lock.lock();
+        try {
+            for (Map.Entry<UUID, MarketListing> entry : listings.entrySet()) {
+                MarketListing listing = entry.getValue();
+                if ((listing.status() == MarketListingStatus.ACTIVE
+                        || listing.status() == MarketListingStatus.PARTIALLY_FILLED)
+                        && !listing.expiresAt().isAfter(now)) {
+                    entry.setValue(listing.withQuantityAndStatus(
+                            listing.quantity(),
+                            MarketListingStatus.EXPIRED));
+                    changed = true;
+                }
+            }
+            if (changed) {
+                persistUnchecked();
+            }
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    private void load() throws IOException {
+        if (persistenceFile == null || !Files.exists(persistenceFile)) {
+            if (persistenceFile != null && persistenceFile.getParent() != null) {
+                Files.createDirectories(persistenceFile.getParent());
+            }
+            return;
+        }
+        try (Reader reader = Files.newBufferedReader(persistenceFile, StandardCharsets.UTF_8)) {
+            List<MarketListing> loaded = gson.fromJson(reader, LISTING_LIST_TYPE);
+            if (loaded != null) {
+                for (MarketListing listing : loaded) {
+                    listings.put(listing.listingId(), listing);
+                }
+            }
+        } catch (RuntimeException exception) {
+            throw new IOException("Unable to parse player market file: " + persistenceFile, exception);
+        }
+    }
+
+    private void persistUnchecked() {
+        if (persistenceFile == null) {
+            return;
+        }
+        try {
+            persist();
+        } catch (IOException exception) {
+            throw new IllegalStateException("Unable to persist player market listings", exception);
+        }
+    }
+
+    private void persist() throws IOException {
+        Path parent = persistenceFile.getParent();
+        if (parent != null) {
+            Files.createDirectories(parent);
+        }
+        Path temp = Files.createTempFile(parent, persistenceFile.getFileName().toString(), ".tmp");
+        try {
+            if (Files.exists(persistenceFile)) {
+                Files.copy(persistenceFile, backupFile, StandardCopyOption.REPLACE_EXISTING);
+            }
+            List<MarketListing> snapshot = listings.values().stream()
+                    .sorted(Comparator.comparing(MarketListing::createdAt))
+                    .toList();
+            try (Writer writer = Files.newBufferedWriter(temp, StandardCharsets.UTF_8)) {
+                gson.toJson(snapshot, LISTING_LIST_TYPE, writer);
+            }
+            try {
+                Files.move(temp, persistenceFile, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+            } catch (java.nio.file.AtomicMoveNotSupportedException exception) {
+                Files.move(temp, persistenceFile, StandardCopyOption.REPLACE_EXISTING);
+            }
+        } finally {
+            Files.deleteIfExists(temp);
         }
     }
 }
