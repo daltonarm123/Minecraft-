@@ -116,6 +116,7 @@ public final class ServerCoreMod {
     public void onRegisterCommands(RegisterCommandsEvent event) {
         ServerCoreCommands.register(event, () -> runtime);
         GamingCastleEssentialsCommands.register(event, () -> runtime, () -> communityData);
+        GamingCastlePublicEconomyCommands.register(event, () -> runtime);
         GamingCastleAuctionHouse.register(event, () -> runtime, () -> auctionHouse);
         GamingCastleEvents.register(event);
         staffTools.registerCommands(event);
