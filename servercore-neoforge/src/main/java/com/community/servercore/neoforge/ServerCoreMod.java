@@ -57,6 +57,7 @@ public final class ServerCoreMod {
         NeoForge.EVENT_BUS.addListener(NeoForgePermissions::onGatherNodes);
         NeoForge.EVENT_BUS.register(this);
         NeoForge.EVENT_BUS.register(new NeoForgeCombatEvents(() -> runtime));
+        NeoForge.EVENT_BUS.register(new GamingCastleCombatTracker());
         NeoForge.EVENT_BUS.register(new NeoForgePlayerDisplayEvents());
         NeoForge.EVENT_BUS.register(new NeoForgeCityProtectionEvents(() -> runtime));
         NeoForge.EVENT_BUS.register(new GamingCastlePlayerEvents(() -> runtime, () -> communityData));
@@ -154,6 +155,9 @@ public final class ServerCoreMod {
             return;
         }
         if (player.tickCount % current.config().portalCheckIntervalTicks() != 0) {
+            return;
+        }
+        if (GamingCastleCombatTracker.teleportBlocked(player)) {
             return;
         }
 
