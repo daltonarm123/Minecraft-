@@ -58,6 +58,7 @@ public final class ServerCoreMod {
         NeoForge.EVENT_BUS.register(this);
         NeoForge.EVENT_BUS.register(new NeoForgeCombatEvents(() -> runtime));
         NeoForge.EVENT_BUS.register(new GamingCastleCombatTracker());
+        NeoForge.EVENT_BUS.register(new GamingCastleSafeZoneEvents());
         NeoForge.EVENT_BUS.register(new NeoForgePlayerDisplayEvents());
         NeoForge.EVENT_BUS.register(new NeoForgeCityProtectionEvents(() -> runtime));
         NeoForge.EVENT_BUS.register(new GamingCastlePlayerEvents(() -> runtime, () -> communityData));
