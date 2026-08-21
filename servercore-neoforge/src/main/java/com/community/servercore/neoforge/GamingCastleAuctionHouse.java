@@ -2,6 +2,7 @@ package com.community.servercore.neoforge;
 
 import com.community.servercore.ServerCoreRuntime;
 import com.community.servercore.economy.PlayerMarketService;
+import com.community.servercore.economy.WalletTransaction;
 import com.community.servercore.economy.WalletTransactionType;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -27,34 +28,38 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Supplier;
 
 /**
- * Persistent, item-backed auction house. The actual ItemStack is escrowed as
- * SNBT, so currency can never change hands without a durable item claim.
+ * Persistent, item-backed public auction house for Gaming Castle.
+ *
+ * The exact ItemStack is stored as SNBT while listed. Purchases use a small
+ * durable pending-purchase journal, so an interrupted server write can be
+ * recovered from the wallet ledger instead of duplicating or losing the item.
  */
 final class GamingCastleAuctionHouse {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final long LISTING_FEE = 25L;
-    private static final int TAX_BASIS_POINTS = 500; // 5%
     private static final Duration LISTING_DURATION = Duration.ofHours(24);
     private static final long MAX_PRICE = 1_000_000_000L;
+    private static final int LIST_LIMIT = 30;
 
     private final Path file;
     private final Path backup;
     private final List<AuctionListing> listings = new ArrayList<>();
     private final List<ItemClaim> claims = new ArrayList<>();
+    private final List<PendingPurchase> pendingPurchases = new ArrayList<>();
 
     GamingCastleAuctionHouse(Path file) throws IOException {
-        this.file = file.toAbsolutePath().normalize();
+        this.file = Objects.requireNonNull(file, "file").toAbsolutePath().normalize();
         this.backup = this.file.resolveSibling(this.file.getFileName() + ".bak");
         load();
     }
@@ -64,10 +69,10 @@ final class GamingCastleAuctionHouse {
             Supplier<ServerCoreRuntime> runtimeSupplier,
             Supplier<GamingCastleAuctionHouse> auctionSupplier) {
         var market = Commands.literal("market")
-                .executes(context -> list(context.getSource(), auctionSupplier));
+                .executes(context -> list(context.getSource(), runtimeSupplier, auctionSupplier));
 
         market.then(Commands.literal("list")
-                .executes(context -> list(context.getSource(), auctionSupplier)));
+                .executes(context -> list(context.getSource(), runtimeSupplier, auctionSupplier)));
 
         market.then(Commands.literal("sell")
                 .then(Commands.argument("price", LongArgumentType.longArg(1L, MAX_PRICE))
@@ -90,18 +95,57 @@ final class GamingCastleAuctionHouse {
                         .executes(context -> cancel(
                                 context.getSource(),
                                 StringArgumentType.getString(context, "listing"),
+                                runtimeSupplier,
                                 auctionSupplier))));
 
         market.then(Commands.literal("claim")
-                .executes(context -> claim(context.getSource(), auctionSupplier)));
+                .executes(context -> claim(context.getSource(), runtimeSupplier, auctionSupplier)));
 
         market.then(Commands.literal("mine")
-                .executes(context -> mine(context.getSource(), auctionSupplier)));
+                .executes(context -> mine(context.getSource(), runtimeSupplier, auctionSupplier)));
 
         market.then(Commands.literal("help")
                 .executes(context -> help(context.getSource())));
 
         event.getDispatcher().register(market);
+    }
+
+    synchronized void recover(ServerCoreRuntime runtime) {
+        Objects.requireNonNull(runtime, "runtime");
+        if (pendingPurchases.isEmpty()) {
+            return;
+        }
+
+        List<PendingPurchase> pending = List.copyOf(pendingPurchases);
+        boolean changed = false;
+        for (PendingPurchase purchase : pending) {
+            UUID buyerId;
+            try {
+                buyerId = UUID.fromString(purchase.buyerId());
+            } catch (IllegalArgumentException exception) {
+                pendingPurchases.remove(purchase);
+                changed = true;
+                continue;
+            }
+
+            boolean paid = runtime.wallets().recentTransactions(buyerId, 1000).stream()
+                    .anyMatch(transaction -> paymentMatches(transaction, purchase.listingId()));
+            if (paid) {
+                completePurchaseInternal(purchase.listingId(), buyerId);
+            } else {
+                pendingPurchases.remove(purchase);
+            }
+            changed = true;
+        }
+        if (changed) {
+            persistUnchecked();
+        }
+    }
+
+    private static boolean paymentMatches(WalletTransaction transaction, String listingId) {
+        return "auction-sale".equals(transaction.reason())
+                && listingId.equals(transaction.attributes().get("listingId"))
+                && transaction.type() == WalletTransactionType.TRANSFER_OUT;
     }
 
     private static int sell(
@@ -114,6 +158,8 @@ final class GamingCastleAuctionHouse {
         ServerCoreRuntime runtime = requireRuntime(source, runtimeSupplier);
         GamingCastleAuctionHouse auction = requireAuction(source, auctionSupplier);
         if (runtime == null || auction == null) return 0;
+        auction.recover(runtime);
+        auction.expireListings();
 
         ItemStack held = player.getMainHandItem();
         if (held.isEmpty()) {
@@ -126,14 +172,14 @@ final class GamingCastleAuctionHouse {
         }
 
         ItemStack escrow = held.copy();
-        String itemSnbt = serialize(player.getServer(), escrow);
+        String listingId = UUID.randomUUID().toString();
         AuctionListing listing = new AuctionListing(
-                UUID.randomUUID().toString(),
+                listingId,
                 player.getUUID().toString(),
                 player.getName().getString(),
                 escrow.getHoverName().getString(),
                 escrow.getCount(),
-                itemSnbt,
+                serialize(player.getServer(), escrow),
                 price,
                 System.currentTimeMillis(),
                 System.currentTimeMillis() + LISTING_DURATION.toMillis(),
@@ -147,13 +193,13 @@ final class GamingCastleAuctionHouse {
                     PlayerMarketService.TREASURY_ACCOUNT_ID,
                     LISTING_FEE,
                     "auction-listing-fee",
-                    java.util.Map.of("listingId", listing.id()),
+                    Map.of("listingId", listingId),
                     WalletTransactionType.LISTING_FEE,
                     WalletTransactionType.CREDIT);
         } catch (RuntimeException exception) {
-            auction.removeListingQuietly(listing.id());
+            auction.removeListingQuietly(listingId);
             returnItem(player, escrow);
-            source.sendFailure(Component.literal("Listing failed: " + exception.getMessage()));
+            source.sendFailure(Component.literal("Listing failed safely: " + exception.getMessage()));
             return 0;
         }
 
@@ -174,16 +220,17 @@ final class GamingCastleAuctionHouse {
         ServerCoreRuntime runtime = requireRuntime(source, runtimeSupplier);
         GamingCastleAuctionHouse auction = requireAuction(source, auctionSupplier);
         if (runtime == null || auction == null) return 0;
-
+        auction.recover(runtime);
         auction.expireListings();
+
         Optional<AuctionListing> resolved = auction.resolve(token);
         if (resolved.isEmpty()) {
             source.sendFailure(Component.literal("Listing not found. Use /market list."));
             return 0;
         }
         AuctionListing listing = resolved.orElseThrow();
-        if (listing.status() != ListingStatus.ACTIVE) {
-            source.sendFailure(Component.literal("That listing is no longer active."));
+        if (listing.status() != ListingStatus.ACTIVE || auction.isPending(listing.id())) {
+            source.sendFailure(Component.literal("That listing is no longer available."));
             return 0;
         }
         if (listing.sellerId().equals(buyer.getUUID().toString())) {
@@ -196,32 +243,27 @@ final class GamingCastleAuctionHouse {
         }
 
         UUID sellerId = UUID.fromString(listing.sellerId());
-        long tax = Math.multiplyExact(listing.price(), TAX_BASIS_POINTS) / 10_000L;
-        long sellerNet = listing.price() - tax;
-
+        boolean paid = false;
         try {
+            auction.beginPurchase(listing.id(), buyer.getUUID());
             runtime.wallets().transfer(
                     buyer.getUUID(),
                     sellerId,
-                    sellerNet,
+                    listing.price(),
                     "auction-sale",
-                    java.util.Map.of("listingId", listing.id()),
+                    Map.of("listingId", listing.id(), "item", listing.displayName()),
                     WalletTransactionType.TRANSFER_OUT,
                     WalletTransactionType.MARKET_SALE);
-            if (tax > 0) {
-                runtime.wallets().transfer(
-                        buyer.getUUID(),
-                        PlayerMarketService.TREASURY_ACCOUNT_ID,
-                        tax,
-                        "auction-tax",
-                        java.util.Map.of("listingId", listing.id()),
-                        WalletTransactionType.MARKET_TAX,
-                        WalletTransactionType.CREDIT);
-            }
-            auction.markSoldAndCreateClaim(listing.id(), buyer.getUUID(), listing.itemSnbt(),
-                    "Purchased " + listing.displayName());
+            paid = true;
+            auction.completePurchase(listing.id(), buyer.getUUID());
         } catch (RuntimeException exception) {
-            source.sendFailure(Component.literal("Purchase failed safely: " + exception.getMessage()));
+            if (!paid) {
+                auction.releasePendingQuietly(listing.id(), buyer.getUUID());
+                source.sendFailure(Component.literal("Purchase failed safely: " + exception.getMessage()));
+            } else {
+                source.sendFailure(Component.literal(
+                        "Payment was recorded, but item delivery needs recovery. Run /market claim again; ServerCore will recover the purchase from the wallet ledger."));
+            }
             return 0;
         }
 
@@ -235,11 +277,15 @@ final class GamingCastleAuctionHouse {
     private static int cancel(
             CommandSourceStack source,
             String token,
+            Supplier<ServerCoreRuntime> runtimeSupplier,
             Supplier<GamingCastleAuctionHouse> auctionSupplier)
             throws com.mojang.brigadier.exceptions.CommandSyntaxException {
         ServerPlayer player = source.getPlayerOrException();
+        ServerCoreRuntime runtime = requireRuntime(source, runtimeSupplier);
         GamingCastleAuctionHouse auction = requireAuction(source, auctionSupplier);
-        if (auction == null) return 0;
+        if (runtime == null || auction == null) return 0;
+        auction.recover(runtime);
+        auction.expireListings();
 
         Optional<AuctionListing> resolved = auction.resolve(token);
         if (resolved.isEmpty()) {
@@ -256,261 +302,326 @@ final class GamingCastleAuctionHouse {
             source.sendFailure(Component.literal("That listing is already closed."));
             return 0;
         }
+        if (auction.isPending(listing.id())) {
+            source.sendFailure(Component.literal("That listing currently has a purchase in progress."));
+            return 0;
+        }
 
         auction.cancelAndCreateClaim(listing.id());
         source.sendSuccess(() -> Component.literal(
-                        "Listing cancelled. The item is waiting in the seller's /market claim mailbox.")
+                        "Listing cancelled. The item was placed in the seller's /market claim mailbox.")
                 .withStyle(ChatFormatting.YELLOW), false);
         return 1;
     }
 
     private static int claim(
             CommandSourceStack source,
+            Supplier<ServerCoreRuntime> runtimeSupplier,
             Supplier<GamingCastleAuctionHouse> auctionSupplier)
             throws com.mojang.brigadier.exceptions.CommandSyntaxException {
         ServerPlayer player = source.getPlayerOrException();
+        ServerCoreRuntime runtime = requireRuntime(source, runtimeSupplier);
         GamingCastleAuctionHouse auction = requireAuction(source, auctionSupplier);
-        if (auction == null) return 0;
+        if (runtime == null || auction == null) return 0;
+        auction.recover(runtime);
         auction.expireListings();
 
-        List<ItemClaim> mine = auction.claimsFor(player.getUUID());
-        if (mine.isEmpty()) {
-            source.sendSuccess(() -> Component.literal("Your Market mailbox is empty."), false);
+        int delivered = auction.deliverClaims(player);
+        int remaining = auction.claimCount(player.getUUID());
+        if (delivered == 0 && remaining == 0) {
+            source.sendSuccess(() -> Component.literal("You have no Market items waiting to be claimed."), false);
             return 1;
         }
-
-        int delivered = 0;
-        int remainingClaims = 0;
-        for (ItemClaim itemClaim : mine) {
-            ItemStack stack;
-            try {
-                stack = deserialize(player.getServer(), itemClaim.itemSnbt());
-            } catch (RuntimeException exception) {
-                remainingClaims++;
-                continue;
-            }
-            if (stack.isEmpty()) {
-                auction.removeClaim(itemClaim.id());
-                continue;
-            }
-
-            ItemStack remainder = stack.copy();
-            player.getInventory().add(remainder);
-            int moved = stack.getCount() - remainder.getCount();
-            if (moved > 0) {
-                delivered += moved;
-            }
-            if (remainder.isEmpty()) {
-                auction.removeClaim(itemClaim.id());
-            } else {
-                auction.updateClaimItem(itemClaim.id(), serialize(player.getServer(), remainder));
-                remainingClaims++;
-            }
+        if (remaining > 0) {
+            source.sendSuccess(() -> Component.literal(
+                            "Claimed " + delivered + " stack(s). " + remaining
+                                    + " stack(s) are still safely stored because your inventory needs more room.")
+                    .withStyle(ChatFormatting.YELLOW), false);
+        } else {
+            source.sendSuccess(() -> Component.literal(
+                            "Claimed " + delivered + " Market stack(s).")
+                    .withStyle(ChatFormatting.GREEN), false);
         }
-        player.getInventory().setChanged();
-
-        int movedTotal = delivered;
-        int left = remainingClaims;
-        source.sendSuccess(() -> Component.literal(
-                        "Market mailbox: delivered " + movedTotal + " item(s)."
-                                + (left > 0 ? " " + left + " claim(s) still need inventory space." : ""))
-                .withStyle(ChatFormatting.GREEN), false);
         return 1;
     }
 
     private static int list(
             CommandSourceStack source,
+            Supplier<ServerCoreRuntime> runtimeSupplier,
             Supplier<GamingCastleAuctionHouse> auctionSupplier) {
+        ServerCoreRuntime runtime = requireRuntime(source, runtimeSupplier);
         GamingCastleAuctionHouse auction = requireAuction(source, auctionSupplier);
-        if (auction == null) return 0;
+        if (runtime == null || auction == null) return 0;
+        auction.recover(runtime);
         auction.expireListings();
-        List<AuctionListing> active = auction.activeListings();
 
+        List<AuctionListing> active = auction.activeListings();
         source.sendSuccess(() -> Component.literal("--- Gaming Castle Player Market ---")
-                .withStyle(ChatFormatting.GOLD), false);
+                .withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD), false);
         if (active.isEmpty()) {
-            source.sendSuccess(() -> Component.literal("No player listings are active."), false);
-        } else {
-            for (AuctionListing listing : active.stream().limit(20).toList()) {
-                source.sendSuccess(() -> Component.literal(
-                        shortId(listing.id()) + " | " + listing.count() + "x " + listing.displayName()
-                                + " | " + listing.price() + " SC | seller: " + listing.sellerName()), false);
-            }
+            source.sendSuccess(() -> Component.literal("No active player listings. Hold an item and use /market sell <price>."), false);
+            return 1;
         }
-        source.sendSuccess(() -> Component.literal(
-                "Sell your entire main-hand stack: /market sell <price> | Buy: /market buy <id> | /market claim"), false);
+        for (AuctionListing listing : active) {
+            source.sendSuccess(() -> Component.literal(
+                    shortId(listing.id()) + " | " + listing.count() + "x " + listing.displayName()
+                            + " | " + listing.price() + " SC | seller " + listing.sellerName()), false);
+        }
+        source.sendSuccess(() -> Component.literal("Buy with /market buy <id>. Items are delivered through /market claim."), false);
         return 1;
     }
 
     private static int mine(
             CommandSourceStack source,
+            Supplier<ServerCoreRuntime> runtimeSupplier,
             Supplier<GamingCastleAuctionHouse> auctionSupplier)
             throws com.mojang.brigadier.exceptions.CommandSyntaxException {
         ServerPlayer player = source.getPlayerOrException();
+        ServerCoreRuntime runtime = requireRuntime(source, runtimeSupplier);
         GamingCastleAuctionHouse auction = requireAuction(source, auctionSupplier);
-        if (auction == null) return 0;
+        if (runtime == null || auction == null) return 0;
+        auction.recover(runtime);
         auction.expireListings();
+
         List<AuctionListing> mine = auction.listingsFor(player.getUUID());
-        source.sendSuccess(() -> Component.literal("--- Your Market Listings ---")
-                .withStyle(ChatFormatting.GOLD), false);
         if (mine.isEmpty()) {
-            source.sendSuccess(() -> Component.literal("You have no listings."), false);
-        } else {
-            for (AuctionListing listing : mine.stream().limit(20).toList()) {
-                source.sendSuccess(() -> Component.literal(
-                        shortId(listing.id()) + " | " + listing.status() + " | "
-                                + listing.count() + "x " + listing.displayName() + " | " + listing.price() + " SC"), false);
-            }
+            source.sendSuccess(() -> Component.literal("You have no active Market listings."), false);
+            return 1;
+        }
+        source.sendSuccess(() -> Component.literal("Your active Market listings:").withStyle(ChatFormatting.GOLD), false);
+        for (AuctionListing listing : mine) {
+            source.sendSuccess(() -> Component.literal(
+                    shortId(listing.id()) + " | " + listing.count() + "x " + listing.displayName()
+                            + " | " + listing.price() + " SC"), false);
         }
         return 1;
     }
 
     private static int help(CommandSourceStack source) {
-        source.sendSuccess(() -> Component.literal("--- Gaming Castle Market ---")
-                .withStyle(ChatFormatting.GOLD), false);
+        source.sendSuccess(() -> Component.literal("--- Gaming Castle Market ---").withStyle(ChatFormatting.GOLD), false);
         source.sendSuccess(() -> Component.literal("/market list - browse active listings"), false);
-        source.sendSuccess(() -> Component.literal("/market sell <price> - escrow your entire main-hand stack for 24 hours (25 SC fee)"), false);
-        source.sendSuccess(() -> Component.literal("/market buy <id> - buy a listing; item goes to your persistent mailbox"), false);
+        source.sendSuccess(() -> Component.literal("/market sell <price> - list the entire stack in your main hand (25 SC fee, 24h)"), false);
+        source.sendSuccess(() -> Component.literal("/market buy <id> - buy a listing"), false);
         source.sendSuccess(() -> Component.literal("/market cancel <id> - cancel your listing"), false);
-        source.sendSuccess(() -> Component.literal("/market claim - deliver purchased/returned items into your inventory"), false);
-        source.sendSuccess(() -> Component.literal("/market mine - show your listings"), false);
+        source.sendSuccess(() -> Component.literal("/market mine - show your active listings"), false);
+        source.sendSuccess(() -> Component.literal("/market claim - receive purchased, cancelled, or expired items"), false);
         return 1;
     }
 
     private synchronized void addListing(AuctionListing listing) {
-        listings.add(listing);
+        listings.add(Objects.requireNonNull(listing, "listing"));
         persistUnchecked();
     }
 
-    private synchronized void removeListingQuietly(String id) {
-        listings.removeIf(listing -> listing.id().equals(id));
+    private synchronized void beginPurchase(String listingId, UUID buyerId) {
+        AuctionListing listing = requireListing(listingId);
+        if (listing.status() != ListingStatus.ACTIVE || isPending(listingId)) {
+            throw new IllegalStateException("Listing is not available");
+        }
+        pendingPurchases.add(new PendingPurchase(listingId, buyerId.toString(), System.currentTimeMillis()));
         persistUnchecked();
     }
 
-    private synchronized Optional<AuctionListing> resolve(String token) {
-        String normalized = token == null ? "" : token.trim().toLowerCase(Locale.ROOT);
-        List<AuctionListing> matches = listings.stream()
-                .filter(listing -> listing.id().toLowerCase(Locale.ROOT).startsWith(normalized))
-                .toList();
-        return matches.size() == 1 ? Optional.of(matches.getFirst()) : Optional.empty();
+    private synchronized void completePurchase(String listingId, UUID buyerId) {
+        PendingPurchase pending = pendingPurchases.stream()
+                .filter(candidate -> candidate.listingId().equals(listingId)
+                        && candidate.buyerId().equals(buyerId.toString()))
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("Purchase journal entry is missing"));
+        completePurchaseInternal(listingId, buyerId);
+        pendingPurchases.remove(pending);
+        persistUnchecked();
     }
 
-    private synchronized List<AuctionListing> activeListings() {
-        return listings.stream()
-                .filter(listing -> listing.status() == ListingStatus.ACTIVE)
-                .sorted(Comparator.comparingLong(AuctionListing::createdAtMillis).reversed())
-                .toList();
-    }
-
-    private synchronized List<AuctionListing> listingsFor(UUID sellerId) {
-        String id = sellerId.toString();
-        return listings.stream()
-                .filter(listing -> listing.sellerId().equals(id))
-                .sorted(Comparator.comparingLong(AuctionListing::createdAtMillis).reversed())
-                .toList();
-    }
-
-    private synchronized List<ItemClaim> claimsFor(UUID ownerId) {
-        String id = ownerId.toString();
-        return claims.stream()
-                .filter(claim -> claim.ownerId().equals(id))
-                .sorted(Comparator.comparingLong(ItemClaim::createdAtMillis))
-                .toList();
-    }
-
-    private synchronized void markSoldAndCreateClaim(
-            String listingId,
-            UUID buyerId,
-            String itemSnbt,
-            String reason) {
-        replaceListingStatus(listingId, ListingStatus.SOLD);
+    private void completePurchaseInternal(String listingId, UUID buyerId) {
+        AuctionListing listing = requireListing(listingId);
+        if (listing.status() == ListingStatus.SOLD) {
+            if (claims.stream().noneMatch(claim -> claim.sourceListingId().equals(listingId)
+                    && claim.ownerId().equals(buyerId.toString()))) {
+                claims.add(new ItemClaim(
+                        UUID.randomUUID().toString(),
+                        buyerId.toString(),
+                        listing.itemSnbt(),
+                        "Purchased " + listing.displayName(),
+                        listingId));
+            }
+            pendingPurchases.removeIf(candidate -> candidate.listingId().equals(listingId));
+            return;
+        }
+        if (listing.status() != ListingStatus.ACTIVE) {
+            throw new IllegalStateException("Listing is no longer active");
+        }
+        replaceListing(listing.withStatus(ListingStatus.SOLD));
         claims.add(new ItemClaim(
                 UUID.randomUUID().toString(),
                 buyerId.toString(),
-                itemSnbt,
-                reason,
-                System.currentTimeMillis()));
-        persistUnchecked();
+                listing.itemSnbt(),
+                "Purchased " + listing.displayName(),
+                listingId));
+        pendingPurchases.removeIf(candidate -> candidate.listingId().equals(listingId));
+    }
+
+    private synchronized void releasePendingQuietly(String listingId, UUID buyerId) {
+        try {
+            if (pendingPurchases.removeIf(candidate -> candidate.listingId().equals(listingId)
+                    && candidate.buyerId().equals(buyerId.toString()))) {
+                persistUnchecked();
+            }
+        } catch (RuntimeException ignored) {
+            // Recovery will reevaluate any surviving journal entry next time.
+        }
     }
 
     private synchronized void cancelAndCreateClaim(String listingId) {
-        AuctionListing listing = listings.stream()
-                .filter(candidate -> candidate.id().equals(listingId))
-                .findFirst()
-                .orElseThrow();
-        replaceListingStatus(listingId, ListingStatus.CANCELLED);
+        AuctionListing listing = requireListing(listingId);
+        if (listing.status() != ListingStatus.ACTIVE || isPending(listingId)) {
+            throw new IllegalStateException("Listing cannot be cancelled now");
+        }
+        replaceListing(listing.withStatus(ListingStatus.CANCELLED));
         claims.add(new ItemClaim(
                 UUID.randomUUID().toString(),
                 listing.sellerId(),
                 listing.itemSnbt(),
-                "Cancelled listing " + shortId(listing.id()),
-                System.currentTimeMillis()));
+                "Cancelled " + listing.displayName(),
+                listing.id()));
         persistUnchecked();
     }
 
     private synchronized void expireListings() {
         long now = System.currentTimeMillis();
         boolean changed = false;
-        for (int index = 0; index < listings.size(); index++) {
-            AuctionListing listing = listings.get(index);
-            if (listing.status() == ListingStatus.ACTIVE && listing.expiresAtMillis() <= now) {
-                listings.set(index, listing.withStatus(ListingStatus.EXPIRED));
-                claims.add(new ItemClaim(
-                        UUID.randomUUID().toString(),
-                        listing.sellerId(),
-                        listing.itemSnbt(),
-                        "Expired listing " + shortId(listing.id()),
-                        now));
-                changed = true;
+        for (AuctionListing listing : List.copyOf(listings)) {
+            if (listing.status() != ListingStatus.ACTIVE
+                    || listing.expiresAtMillis() > now
+                    || isPending(listing.id())) {
+                continue;
             }
+            replaceListing(listing.withStatus(ListingStatus.EXPIRED));
+            claims.add(new ItemClaim(
+                    UUID.randomUUID().toString(),
+                    listing.sellerId(),
+                    listing.itemSnbt(),
+                    "Expired " + listing.displayName(),
+                    listing.id()));
+            changed = true;
         }
         if (changed) persistUnchecked();
     }
 
-    private void replaceListingStatus(String listingId, ListingStatus status) {
+    private synchronized List<AuctionListing> activeListings() {
+        return listings.stream()
+                .filter(listing -> listing.status() == ListingStatus.ACTIVE)
+                .filter(listing -> !isPending(listing.id()))
+                .sorted(Comparator.comparingLong(AuctionListing::createdAtMillis).reversed())
+                .limit(LIST_LIMIT)
+                .toList();
+    }
+
+    private synchronized List<AuctionListing> listingsFor(UUID sellerId) {
+        String seller = sellerId.toString();
+        return listings.stream()
+                .filter(listing -> listing.sellerId().equals(seller))
+                .filter(listing -> listing.status() == ListingStatus.ACTIVE)
+                .filter(listing -> !isPending(listing.id()))
+                .sorted(Comparator.comparingLong(AuctionListing::createdAtMillis).reversed())
+                .toList();
+    }
+
+    private synchronized Optional<AuctionListing> resolve(String token) {
+        String normalized = token == null ? "" : token.trim().toLowerCase(Locale.ROOT);
+        if (normalized.isBlank()) return Optional.empty();
+        List<AuctionListing> matches = listings.stream()
+                .filter(listing -> listing.id().toLowerCase(Locale.ROOT).startsWith(normalized))
+                .toList();
+        return matches.size() == 1 ? Optional.of(matches.getFirst()) : Optional.empty();
+    }
+
+    private synchronized boolean isPending(String listingId) {
+        return pendingPurchases.stream().anyMatch(pending -> pending.listingId().equals(listingId));
+    }
+
+    private synchronized int deliverClaims(ServerPlayer player) {
+        int delivered = 0;
+        String owner = player.getUUID().toString();
+        for (ItemClaim claim : List.copyOf(claims)) {
+            if (!claim.ownerId().equals(owner)) continue;
+            ItemStack stack = deserialize(player.getServer(), claim.itemSnbt());
+            player.getInventory().add(stack);
+            if (stack.isEmpty()) {
+                claims.remove(claim);
+                delivered++;
+            } else {
+                replaceClaim(claim, claim.withItemSnbt(serialize(player.getServer(), stack)));
+            }
+        }
+        persistUnchecked();
+        return delivered;
+    }
+
+    private synchronized int claimCount(UUID playerId) {
+        String owner = playerId.toString();
+        return (int) claims.stream().filter(claim -> claim.ownerId().equals(owner)).count();
+    }
+
+    private AuctionListing requireListing(String id) {
+        return listings.stream()
+                .filter(listing -> listing.id().equals(id))
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("Listing not found"));
+    }
+
+    private void replaceListing(AuctionListing updated) {
         for (int index = 0; index < listings.size(); index++) {
-            AuctionListing listing = listings.get(index);
-            if (listing.id().equals(listingId)) {
-                if (listing.status() != ListingStatus.ACTIVE) {
-                    throw new IllegalStateException("Listing is already closed");
-                }
-                listings.set(index, listing.withStatus(status));
+            if (listings.get(index).id().equals(updated.id())) {
+                listings.set(index, updated);
                 return;
             }
         }
-        throw new IllegalArgumentException("Listing not found");
+        throw new IllegalStateException("Listing not found: " + updated.id());
     }
 
-    private synchronized void removeClaim(String claimId) {
-        claims.removeIf(claim -> claim.id().equals(claimId));
-        persistUnchecked();
+    private void replaceClaim(ItemClaim oldClaim, ItemClaim updated) {
+        int index = claims.indexOf(oldClaim);
+        if (index >= 0) claims.set(index, updated);
     }
 
-    private synchronized void updateClaimItem(String claimId, String itemSnbt) {
-        for (int index = 0; index < claims.size(); index++) {
-            ItemClaim claim = claims.get(index);
-            if (claim.id().equals(claimId)) {
-                claims.set(index, new ItemClaim(
-                        claim.id(), claim.ownerId(), itemSnbt, claim.reason(), claim.createdAtMillis()));
+    private synchronized void removeListingQuietly(String listingId) {
+        try {
+            if (listings.removeIf(listing -> listing.id().equals(listingId))) {
+                pendingPurchases.removeIf(pending -> pending.listingId().equals(listingId));
                 persistUnchecked();
-                return;
             }
+        } catch (RuntimeException ignored) {
+            // The caller still restores the player's item.
         }
     }
 
     private void load() throws IOException {
         if (!Files.exists(file)) {
-            if (file.getParent() != null) Files.createDirectories(file.getParent());
+            Path parent = file.getParent();
+            if (parent != null) Files.createDirectories(parent);
             return;
         }
-        try (Reader reader = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
+        try {
+            loadFrom(file);
+        } catch (IOException primary) {
+            if (!Files.exists(backup)) throw primary;
+            listings.clear();
+            claims.clear();
+            pendingPurchases.clear();
+            loadFrom(backup);
+        }
+    }
+
+    private void loadFrom(Path source) throws IOException {
+        try (Reader reader = Files.newBufferedReader(source, StandardCharsets.UTF_8)) {
             AuctionState state = GSON.fromJson(reader, AuctionState.class);
-            if (state != null) {
-                if (state.listings() != null) listings.addAll(state.listings());
-                if (state.claims() != null) claims.addAll(state.claims());
-            }
+            if (state == null) return;
+            if (state.listings() != null) listings.addAll(state.listings());
+            if (state.claims() != null) claims.addAll(state.claims());
+            if (state.pendingPurchases() != null) pendingPurchases.addAll(state.pendingPurchases());
         } catch (RuntimeException exception) {
-            throw new IOException("Unable to parse auction house data: " + file, exception);
+            throw new IOException("Unable to parse auction house data: " + source, exception);
         }
     }
 
@@ -531,7 +642,10 @@ final class GamingCastleAuctionHouse {
                 Files.copy(file, backup, StandardCopyOption.REPLACE_EXISTING);
             }
             try (Writer writer = Files.newBufferedWriter(temp, StandardCharsets.UTF_8)) {
-                GSON.toJson(new AuctionState(new ArrayList<>(listings), new ArrayList<>(claims)), writer);
+                GSON.toJson(new AuctionState(
+                        new ArrayList<>(listings),
+                        new ArrayList<>(claims),
+                        new ArrayList<>(pendingPurchases)), writer);
             }
             try {
                 Files.move(temp, file, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
@@ -544,8 +658,7 @@ final class GamingCastleAuctionHouse {
     }
 
     private static String serialize(MinecraftServer server, ItemStack stack) {
-        CompoundTag tag = stack.saveOptional(server.registryAccess());
-        return tag.toString();
+        return stack.saveOptional(server.registryAccess()).toString();
     }
 
     private static ItemStack deserialize(MinecraftServer server, String snbt) {
@@ -589,7 +702,12 @@ final class GamingCastleAuctionHouse {
         return id.length() <= 8 ? id : id.substring(0, 8);
     }
 
-    private enum ListingStatus { ACTIVE, SOLD, CANCELLED, EXPIRED }
+    private enum ListingStatus {
+        ACTIVE,
+        SOLD,
+        CANCELLED,
+        EXPIRED
+    }
 
     private record AuctionListing(
             String id,
@@ -602,19 +720,21 @@ final class GamingCastleAuctionHouse {
             long createdAtMillis,
             long expiresAtMillis,
             ListingStatus status) {
-        AuctionListing {
-            Objects.requireNonNull(id);
-            Objects.requireNonNull(sellerId);
-            Objects.requireNonNull(sellerName);
-            Objects.requireNonNull(displayName);
-            Objects.requireNonNull(itemSnbt);
-            Objects.requireNonNull(status);
+        private AuctionListing {
+            Objects.requireNonNull(id, "id");
+            Objects.requireNonNull(sellerId, "sellerId");
+            Objects.requireNonNull(sellerName, "sellerName");
+            Objects.requireNonNull(displayName, "displayName");
+            Objects.requireNonNull(itemSnbt, "itemSnbt");
+            Objects.requireNonNull(status, "status");
+            if (count < 1) throw new IllegalArgumentException("count must be positive");
+            if (price < 1) throw new IllegalArgumentException("price must be positive");
         }
 
-        AuctionListing withStatus(ListingStatus value) {
+        private AuctionListing withStatus(ListingStatus newStatus) {
             return new AuctionListing(
                     id, sellerId, sellerName, displayName, count, itemSnbt,
-                    price, createdAtMillis, expiresAtMillis, value);
+                    price, createdAtMillis, expiresAtMillis, newStatus);
         }
     }
 
@@ -623,7 +743,29 @@ final class GamingCastleAuctionHouse {
             String ownerId,
             String itemSnbt,
             String reason,
-            long createdAtMillis) { }
+            String sourceListingId) {
+        private ItemClaim {
+            Objects.requireNonNull(id, "id");
+            Objects.requireNonNull(ownerId, "ownerId");
+            Objects.requireNonNull(itemSnbt, "itemSnbt");
+            reason = Objects.requireNonNullElse(reason, "Market item");
+            sourceListingId = Objects.requireNonNullElse(sourceListingId, "");
+        }
 
-    private record AuctionState(List<AuctionListing> listings, List<ItemClaim> claims) { }
+        private ItemClaim withItemSnbt(String replacement) {
+            return new ItemClaim(id, ownerId, replacement, reason, sourceListingId);
+        }
+    }
+
+    private record PendingPurchase(String listingId, String buyerId, long createdAtMillis) {
+        private PendingPurchase {
+            Objects.requireNonNull(listingId, "listingId");
+            Objects.requireNonNull(buyerId, "buyerId");
+        }
+    }
+
+    private record AuctionState(
+            List<AuctionListing> listings,
+            List<ItemClaim> claims,
+            List<PendingPurchase> pendingPurchases) { }
 }
