@@ -1,7 +1,6 @@
 package com.community.servercore.neoforge;
 
 import com.community.servercore.ServerCoreRuntime;
-import com.community.servercore.command.CommandResult;
 import com.community.servercore.economy.WalletTransactionType;
 import com.community.servercore.player.PlayerProfile;
 import com.mojang.brigadier.arguments.StringArgumentType;
@@ -10,7 +9,6 @@ import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
-import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 
@@ -122,9 +120,9 @@ final class GamingCastleEssentialsCommands {
         dispatcher.register(Commands.literal("leaderboard")
                 .executes(context -> showLeaderboard(context.getSource(), runtimeSupplier)));
 
-        // Friendly public aliases for the existing ServerCore economy tree.
+        // Friendly public aliases for safe player-facing economy actions.
+        // /market is registered separately by the item-backed GamingCastleAuctionHouse.
         registerRedirect(dispatcher.getRoot(), dispatcher, "shop", "economy", "shop");
-        registerRedirect(dispatcher.getRoot(), dispatcher, "market", "economy", "market");
         registerRedirect(dispatcher.getRoot(), dispatcher, "balance", "economy", "balance");
         registerRedirect(dispatcher.getRoot(), dispatcher, "pay", "economy", "pay");
     }
@@ -292,8 +290,8 @@ final class GamingCastleEssentialsCommands {
         source.sendSuccess(() -> Component.literal("--- Gaming Castle Commands ---").withStyle(ChatFormatting.LIGHT_PURPLE), false);
         source.sendSuccess(() -> Component.literal("Travel: /spawn /hub /sethome /home /back /tpa <player> /tpaccept /tpdeny"), false);
         source.sendSuccess(() -> Component.literal("Economy: /balance /shop /market /pay <player> <amount> /daily"), false);
-        source.sendSuccess(() -> Component.literal("Community: /rules /discord /stats /leaderboard"), false);
-        source.sendSuccess(() -> Component.literal("Duels: /duel join casual|ranked /duel leave /duel stats"), false);
+        source.sendSuccess(() -> Component.literal("Community: /rules /discord /stats /leaderboard /report <player> <reason>"), false);
+        source.sendSuccess(() -> Component.literal("Duels: /duel join casual|ranked /duel leave /duel stats /duel spectate"), false);
         return 1;
     }
 
