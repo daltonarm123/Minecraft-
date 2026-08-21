@@ -14,12 +14,12 @@ import net.neoforged.bus.api.IEventBus;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.common.extensions.IMenuTypeExtension;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 import net.neoforged.neoforge.event.tick.PlayerTickEvent;
-import net.neoforged.neoforge.common.extensions.IMenuTypeExtension;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredRegister;
 import org.slf4j.Logger;
@@ -32,8 +32,8 @@ import java.util.UUID;
 public final class ServerCoreMod {
     public static final String MOD_ID = "servercore";
     private static final Logger LOGGER = LogUtils.getLogger();
+    private static final Path DATA_DIRECTORY = Path.of("config", "servercore");
 
-    // Development bootstrap account used by the private ATM10 test instance.
     private static final UUID DEVELOPMENT_PLAYER_UUID =
             UUID.fromString("ddd126d4-deb9-4e42-9a63-355f0571a966");
 
@@ -44,6 +44,7 @@ public final class ServerCoreMod {
 
     private volatile MinecraftServer server;
     private volatile ServerCoreRuntime runtime;
+    private volatile GamingCastleDataStore communityData;
 
     public ServerCoreMod(IEventBus modEventBus) {
         MENU_TYPES.register(modEventBus);
@@ -52,6 +53,7 @@ public final class ServerCoreMod {
         NeoForge.EVENT_BUS.register(new NeoForgeCombatEvents(() -> runtime));
         NeoForge.EVENT_BUS.register(new NeoForgePlayerDisplayEvents());
         NeoForge.EVENT_BUS.register(new NeoForgeCityProtectionEvents(() -> runtime));
+        NeoForge.EVENT_BUS.register(new GamingCastlePlayerEvents(() -> runtime, () -> communityData));
         LOGGER.info("ServerCore NeoForge adapter loaded");
     }
 
@@ -60,27 +62,38 @@ public final class ServerCoreMod {
         server = event.getServer();
         try {
             runtime = ServerCoreRuntime.bootstrap(
-                    Path.of("config", "servercore"),
+                    DATA_DIRECTORY,
                     new NeoForgePortalAccessService(() -> server),
                     new NeoForgePortalTeleportService(() -> server));
             NeoForgePermissions.setRoleStore(runtime.roleStore());
+
+            try {
+                communityData = new GamingCastleDataStore(DATA_DIRECTORY.resolve("community-player-data.json"));
+            } catch (IOException exception) {
+                communityData = null;
+                LOGGER.error("Unable to load Gaming Castle community player data", exception);
+            }
+
             try {
                 GamingCastlePortalBootstrap.ensure(runtime);
             } catch (IOException exception) {
                 LOGGER.error("Unable to configure the managed Gaming Castle portal network", exception);
             }
+
             LOGGER.info(
                     "ServerCore started with {} configured portals",
                     runtime.portals().list().size());
         } catch (IOException exception) {
             LOGGER.error("ServerCore failed to start", exception);
             runtime = null;
+            communityData = null;
         }
     }
 
     @SubscribeEvent
     public void onRegisterCommands(RegisterCommandsEvent event) {
         ServerCoreCommands.register(event, () -> runtime);
+        GamingCastleEssentialsCommands.register(event, () -> runtime, () -> communityData);
         AccountLinkCommands.register(event);
     }
 
@@ -103,9 +116,7 @@ public final class ServerCoreMod {
             LOGGER.error("Failed to grant Developer role to {}", player.getName().getString(), exception);
         }
 
-        // The current command tree still uses vanilla GameMaster gates at the top level.
-        // OP the designated development account so every ServerCore command is available
-        // while we finish migrating those gates to ServerCore permission nodes.
+        // Temporary bootstrap while legacy admin command roots still use vanilla permission gates.
         if (!currentServer.getPlayerList().isOp(player.getGameProfile())) {
             currentServer.getPlayerList().op(player.getGameProfile());
             currentServer.getPlayerList().sendPlayerPermissionLevel(player);
@@ -142,6 +153,7 @@ public final class ServerCoreMod {
     @SubscribeEvent
     public void onServerStopping(ServerStoppingEvent event) {
         LOGGER.info("ServerCore stopping");
+        communityData = null;
         runtime = null;
         server = null;
     }
