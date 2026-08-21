@@ -22,20 +22,20 @@ final class NeoForgePermissions {
             UUID.fromString("ddd126d4-deb9-4e42-9a63-355f0571a966");
 
     private static final Map<String, PermissionNode<Boolean>> NODES = new LinkedHashMap<>();
-    // Set once on server start; allows /role give to work without a separate permissions mod
     private static volatile LocalRoleStore roleStore;
 
     static {
-        for (StaffRole role : StaffRole.values()) node(role.permission());
-        node(STAFF_PERMISSION);
-        node(PortalCommandService.ADMIN_PERMISSION); // servercore.admin — portal management
-        node(EconomyCommandService.USE_PERMISSION);
-        node(EconomyCommandService.ADMIN_PERMISSION);
-        node(EconomyCommandService.MODERATION_PERMISSION);
-        node(RoleCommandService.VIEW_PERMISSION);
-        node(RoleCommandService.MANAGE_PERMISSION);
-        node(RoleCommandService.DEV_AREA_PERMISSION);
-        node(RoleCommandService.ADMIN_AREA_PERMISSION);
+        for (StaffRole role : StaffRole.values()) node(role.permission(), false);
+        node(STAFF_PERMISSION, false);
+        node(PortalCommandService.ADMIN_PERMISSION, false);
+        // Player-facing permissions are available by default; FTB Ranks can still override them.
+        node(EconomyCommandService.USE_PERMISSION, true);
+        node(EconomyCommandService.ADMIN_PERMISSION, false);
+        node(EconomyCommandService.MODERATION_PERMISSION, false);
+        node(RoleCommandService.VIEW_PERMISSION, true);
+        node(RoleCommandService.MANAGE_PERMISSION, false);
+        node(RoleCommandService.DEV_AREA_PERMISSION, false);
+        node(RoleCommandService.ADMIN_AREA_PERMISSION, false);
     }
 
     static void setRoleStore(LocalRoleStore store) {
@@ -47,10 +47,6 @@ final class NeoForgePermissions {
     }
 
     static boolean check(ServerPlayer player, String permission) {
-        // Private ATM10 development bootstrap: SoaREnvy should display only as Developer,
-        // but can exercise all non-role ServerCore permissions while features are being tested.
-        // This must run before PermissionAPI because the dev account is temporarily OP'd and
-        // the default resolver would otherwise make every staff role (including Owner) true.
         if (DEVELOPMENT_PLAYER_UUID.equals(player.getUUID()) && permission.startsWith("servercore.")) {
             if (permission.startsWith("servercore.role.")) {
                 return StaffRole.DEVELOPER.permission().equals(permission);
@@ -68,19 +64,18 @@ final class NeoForgePermissions {
             }
         }
 
-        // Fall through to FTB Ranks / other permission mods via NeoForge PermissionAPI
         PermissionNode<Boolean> node = NODES.get(permission);
         if (node != null) return Boolean.TRUE.equals(PermissionAPI.getPermission(player, node));
         return player.hasPermissions(2);
     }
 
-    private static void node(String dotted) {
+    private static void node(String dotted, boolean defaultForPlayers) {
         String[] parts = dotted.split("\\.", 2);
         String namespace = parts.length == 2 ? parts[0] : "servercore";
         String path = parts.length == 2 ? parts[1] : dotted;
-        // Default resolver: grant to op level 2 when no permission mod is present
         NODES.put(dotted, new PermissionNode<>(namespace, path, PermissionTypes.BOOLEAN,
-                (player, uuid, ctx) -> player != null && player.hasPermissions(2)));
+                (player, uuid, ctx) -> player != null
+                        && (defaultForPlayers || player.hasPermissions(2))));
     }
 
     private NeoForgePermissions() {}
